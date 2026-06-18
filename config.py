@@ -125,6 +125,10 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 NOTIFY_WINDOW_HOURS = float(os.getenv("NOTIFY_WINDOW_HOURS", "12"))
 # 종료 직전 2차(마지막) 알림: 이 분(分) 이내로 임박하면 한 번 더 리마인드.
 FINAL_ALERT_MINUTES = float(os.getenv("FINAL_ALERT_MINUTES", "15"))
+# 상주 프로그램(agent) 자동 수집 간격(분).
+COLLECT_INTERVAL_MINUTES = int(os.getenv("COLLECT_INTERVAL_MINUTES", "60"))
+# 생존신호 보낼 시각(시, 24h). 기본 아침9·점심13·저녁19.
+HEARTBEAT_HOURS = os.getenv("HEARTBEAT_HOURS", "9,13,19")
 
 # ---------- 저장소 ----------
 DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "data" / "psa.db"))
