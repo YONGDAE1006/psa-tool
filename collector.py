@@ -33,8 +33,8 @@ def run():
 
     out = []
     alert_rows = []   # 목록엔 안 넣지만 너무 좋아서 알림만 보낼 위험(하락) 매물
-    skipped = {"country": 0, "shipping": 0, "currency": 0, "budget": 0, "keyword": 0,
-               "lowvalue": 0, "lowprofit": 0, "bids": 0, "risky": 0}
+    skipped = {"country": 0, "shipping": 0, "currency": 0, "foreign": 0, "budget": 0,
+               "keyword": 0, "lowvalue": 0, "lowprofit": 0, "bids": 0, "risky": 0}
     for it in listings:
         title = it["title"]
         # PSA 10 매물만 (제목에 PSA 10 표기가 있는 것)
@@ -56,6 +56,9 @@ def run():
             skipped["budget"] += 1
             continue
         low = title.lower()
+        if config.ENGLISH_ONLY and any(m in low for m in config.FOREIGN_MARKERS):
+            skipped["foreign"] += 1
+            continue
         if any(kw in low for kw in config.EXCLUDE_KEYWORDS):
             skipped["keyword"] += 1
             continue
@@ -189,6 +192,7 @@ def run():
           f"bid>{config.MAX_BID:.0f}: {skipped['budget']}, "
           f"value<{config.MIN_MARKET_VALUE:.0f}: {skipped['lowvalue']}, "
           f"profit<{config.MIN_PROFIT:.0f}: {skipped['lowprofit']}, "
+          f"foreign(영어판아님): {skipped['foreign']}, "
           f"bids<{config.MIN_BID_COUNT}: {skipped['bids']}, keyword: {skipped['keyword']}, "
           f"risky(hidden): {skipped['risky']}, risky-alerts: {len(alert_rows)}")
     return len(out)

@@ -41,6 +41,14 @@ HIGH_ROI_OVERRIDE = float(os.getenv("HIGH_ROI_OVERRIDE", "0.5"))
 MAX_BID = float(os.getenv("MAX_BID", "500"))
 # 시세 하한(USD). 카드 PSA10 시세가 이 값 미만이면 제외(저가 카드 노이즈 제거). 0이면 무제한.
 MIN_MARKET_VALUE = float(os.getenv("MIN_MARKET_VALUE", "50"))
+# 영어판만 보기: 제목에 외국어/타지역 표기 있으면 제외 (PPT 매칭률↑, 크레딧 절약)
+ENGLISH_ONLY = os.getenv("ENGLISH_ONLY", "true").lower() == "true"
+FOREIGN_MARKERS = [
+    w.strip().lower() for w in os.getenv(
+        "FOREIGN_MARKERS",
+        "japanese,japan,jpn,jp ,korean,chinese,german,french,spanish,italian,portuguese,taiwan"
+    ).split(",") if w.strip()
+]
 # 제목에 이 단어가 있으면 제외 (묶음/커스텀/가짜 등). 쉼표로 구분.
 EXCLUDE_KEYWORDS = [
     w.strip().lower() for w in os.getenv(
