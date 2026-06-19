@@ -29,7 +29,10 @@ EBAY_SHIP_ZIP = os.getenv("EBAY_SHIP_ZIP", "19720")
 # → 그냥 로그인된 메인(스나이프 추가 폼)으로 열고 번호·입찰가는 대시보드서 복붙.
 GIXEN_URL = os.getenv("GIXEN_URL", "https://www.gixen.com")
 SEARCH_QUERY = os.getenv("SEARCH_QUERY", "pokemon psa10")  # 붙여써야 PSA10만 정확히 잡힘
-SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "100"))  # 한 번에 가져올 매물 수
+SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "250"))  # 한 번에 가져올 매물 수(100≈6h, 250≈15h 커버)
+# 상승추세 카드: PPT 90일가중 시세가 최근가를 못 따라갈 때 priceHistory 최근값으로 보정.
+# 단 스파이크 방지로 90일가중의 이 배수까지만 올림(예: 1.6 = 최대 1.6배).
+MAX_RECENT_MULT = float(os.getenv("MAX_RECENT_MULT", "1.6"))
 
 # ---------- 매물 필터 (거래 조건) ----------
 # 상품 소재지 국가. "US" = 미국 내 매물만. 빈값이면 전체 허용.

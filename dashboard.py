@@ -56,7 +56,7 @@ if auto_refresh:
 
 min_roi = st.sidebar.slider("최소 ROI (비딩 후보 기준)", 0.0, 2.0, float(config.MIN_ROI), 0.05)
 min_score = st.sidebar.slider("최소 매칭 신뢰도", 0, 100, int(config.MIN_MATCH_SCORE), 5)
-max_hours = st.sidebar.slider("남은 시간 최대(시간)", 1, 72, 24, 1)
+max_hours = st.sidebar.slider("남은 시간 최대(시간)", 1, 72, 10, 1)
 only_good = st.sidebar.checkbox("비딩 후보만 보기", value=False)
 
 if st.sidebar.button("🔄 데이터 새로고침 (eBay 다시 수집)"):
@@ -220,7 +220,7 @@ with tab1:
         view = view.sort_values("profit", ascending=False, na_position="last")
 
     st.caption(
-        f"📡 종료임박 경매(약 6시간 내 종료분)에서 추린 후보 **{len(view)}건**. "
+        f"📡 종료임박 경매(약 10~15시간 내 종료분)에서 추린 후보 **{len(view)}건**. "
         "조기경매는 종료 직전 가격이 오르니 **권장 최대입찰가**까지만 Gixen에 걸어두세요."
     )
     if view.empty:
