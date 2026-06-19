@@ -27,23 +27,21 @@ def build_query(pc_console, pc_name, title, match_score):
 
 
 def verify_query(matched_name, title=""):
-    """시세 검증(PriceCharting/eBay) 검색어. 시세 가져온 카드명(matched_name)을 깔끔히 변환.
-    원제목엔 SHINY/GEM MINT/연도 등 노이즈가 많아 PriceCharting서 0건 → 카드명으로 검색."""
-    base = ""
+    """시세 검증(PriceCharting/eBay) 검색어 = '카드명 + 카드번호 첫부분'만.
+    세트명/총번호(/SV94)/연도/SHINY 등은 빼야 PriceCharting서 정확히 나옴.
+    예: matched_name 'Buzzwole GX SV68/SV94 · Hidden Fates: Shiny Vault' → 'Buzzwole GX SV68'."""
     if matched_name:
-        parts = matched_name.split("·")
-        left = parts[0].replace("-", " ")
-        # 세트명 앞 코드(SV:/ME:/SWSH09: 등) 제거. 'Hidden Fates:'처럼 실제 세트명은 유지.
-        setname = re.sub(r"^[A-Za-z0-9]+\s*:\s*", "", parts[1].strip()) if len(parts) > 1 else ""
-        seen, toks = set(), []
-        for t in left.split():            # 중복 번호 토큰 제거(183/165 183/165 → 183/165)
-            if t.lower() not in seen:
-                seen.add(t.lower())
-                toks.append(t)
-        base = (" ".join(toks) + " " + setname).strip()
-    if not base:
-        base = title or ""
-    return re.sub(r"\s+", " ", base).strip()
+        left = matched_name.split("·")[0].replace("-", " ")
+        name_toks, num = [], None
+        for t in left.split():
+            if re.match(r"^[A-Za-z]{0,3}\d", t):     # 카드번호 토큰(SV68/SV94, 183/165, GG55, 024)
+                num = t.split("/")[0]                # 첫 부분만(SV68/SV94 → SV68)
+                break
+            name_toks.append(t)
+        if name_toks:
+            base = " ".join(name_toks) + (f" {num}" if num else "")
+            return re.sub(r"\s+", " ", base).strip()
+    return re.sub(r"\s+", " ", (title or "")).strip()
 
 
 def ebay_sold_url(query):
