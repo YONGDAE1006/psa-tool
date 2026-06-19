@@ -237,29 +237,35 @@ with tab1:
     for _, r in view.iterrows():
         ic, lbl = _BADGE.get(r["신호"], ("•", "관망"))
         with st.container(border=True):
-            head = st.columns([8, 2])
-            head[0].markdown(f"#### {ic} {r['title']}")
-            head[1].markdown(
-                f"<div style='text-align:right;padding-top:12px;color:#888'>⏳ <b>{r['남은시간']}</b></div>",
-                unsafe_allow_html=True)
+            cimg, cmain = st.columns([1, 6])
+            with cimg:
+                if r.get("image"):
+                    st.image(r["image"], use_container_width=True)
+            with cmain:
+                head = st.columns([8, 2])
+                head[0].markdown(f"#### {ic} {r['title']}")
+                head[1].markdown(
+                    f"<div style='text-align:right;padding-top:10px;color:#888'>⏳ <b>{r['남은시간']}</b></div>",
+                    unsafe_allow_html=True)
+                _sfb = int(r.get("seller_feedback") or 0)
+                _swarn = ("  ·  ⚠️ **신규/저평판 셀러 — 사기(가짜슬랩·미발송) 주의**"
+                          if _sfb < config.SELLER_FLAG_FEEDBACK else "")
+                st.caption(
+                    f"신호 **{lbl}**  ·  👤 셀러 **{r.get('seller_name') or '-'}** "
+                    f"(리뷰 {_sfb} · {r.get('seller_pct') or 0:.0f}%){_swarn}")
+                m = st.columns(4)
+                m[0].metric("현재가", _money(r["current_bid"]))
+                m[1].metric("시세", _money(r["market_value"]),
+                            help=f"실낙찰 표본 {int(r['sold_n'] or 0)}건")
+                m[2].metric("권장 최대입찰", _money(r["max_bid"]))
+                m[3].metric("예상수익", _money(r["profit"]),
+                            help=(f"ROI {r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else None))
 
-            _sfb = int(r.get("seller_feedback") or 0)
-            _swarn = ("  ·  ⚠️ **신규/저평판 셀러 — 사기(가짜슬랩·미발송) 주의**"
-                      if _sfb < config.SELLER_FLAG_FEEDBACK else "")
-            st.caption(
-                f"신호 **{lbl}**  ·  👤 셀러 **{r.get('seller_name') or '-'}** "
-                f"(리뷰 {_sfb} · {r.get('seller_pct') or 0:.0f}%){_swarn}")
-
-            m = st.columns(4)
-            m[0].metric("현재가", _money(r["current_bid"]))
-            m[1].metric("권장 최대입찰", _money(r["max_bid"]))
-            m[2].metric("ROI", f"{r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else "-")
-            m[3].metric("예상수익", _money(r["profit"]))
-
-            st.caption(
-                f"시세 **{_money(r['market_value'])}** (표본 {int(r['sold_n'] or 0)}건 · 역대 {_money(r['all_time_value'])})"
-                f"  ·  배송 {_money(r['shipping'], 2)}  ·  {r['추세'] or ''}  ·  손익분기 {_money(r['breakeven_bid'])}"
-                f"  ·  🔗 시세기준 카드: **{r.get('matched_name') or '-'}**")
+            _roi = f"**ROI {r['ROI%']:.0f}%**  ·  " if pd.notna(r.get("ROI%")) else ""
+            st.markdown(
+                f"{_roi}**배송 {_money(r['shipping'], 2)}**  ·  역대 {_money(r['all_time_value'])}"
+                f"  ·  표본 {int(r['sold_n'] or 0)}건  ·  손익분기 {_money(r['breakeven_bid'])}"
+                f"  ·  {r['추세'] or ''}  ·  🔗 시세기준: **{r.get('matched_name') or '-'}**")
 
             _num = links.ebay_item_number(r.get("url"), r.get("item_id"))
             c1, c2, c3, c4 = st.columns([2, 2, 2, 3])
@@ -274,9 +280,9 @@ with tab1:
                 "내 최대입찰가($)", min_value=0.0, step=1.0,
                 value=float(round(r["max_bid"], 2)) if pd.notna(r.get("max_bid")) else 0.0,
                 key=f"bid_{r['item_id']}")
-            st.caption(
-                f"📋 Gixen 붙여넣기 → eBay번호 **{_num or '?'}** · 최대입찰 **${_mb:.2f}**  "
-                "(위 칸에서 직접 조절 — 권장값은 PPT 기준, 얇은 카드는 시세검증 보고 조정하세요)")
+            st.markdown(
+                f"📋 Gixen 붙여넣기 → eBay번호 `{_num or '?'}` · 최대입찰 `${_mb:.2f}` "
+                "— 위 칸에서 직접 조절(얇은 카드는 시세검증 보고)")
 
     st.markdown(
         f"🔎 추가 검증 도구: [130point]({links.point130_url()}) · "
