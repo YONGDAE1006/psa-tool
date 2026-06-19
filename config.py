@@ -16,6 +16,9 @@ load_dotenv(BASE_DIR / ".env")
 MODE = os.getenv("MODE", "demo").strip().lower()
 
 # ---------- eBay ----------
+# 매물 소스: official(eBay 공식 API) / serpapi(승인 전 우회) / (demo는 MODE로)
+EBAY_PROVIDER = os.getenv("EBAY_PROVIDER", "official").strip().lower()
+SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID", "")
 EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET", "")
 EBAY_MARKETPLACE = os.getenv("EBAY_MARKETPLACE", "EBAY_US")

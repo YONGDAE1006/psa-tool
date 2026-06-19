@@ -12,6 +12,7 @@ eBay 매물 수집기.
 import base64
 import datetime as dt
 import random
+import re
 import time
 
 import requests
@@ -153,7 +154,63 @@ def _fetch_demo():
     return out
 
 
+# ----------------- SerpApi (eBay 승인 전 우회) -----------------
+def _parse_time_left(s):
+    """'2m', '1h 30m', '2d 3h', '45s' -> 초. 못 읽으면 None."""
+    if not s:
+        return None
+    secs = 0
+    for num, unit in re.findall(r"(\d+)\s*([dhms])", str(s).lower()):
+        secs += int(num) * {"d": 86400, "h": 3600, "m": 60, "s": 1}[unit]
+    return secs or None
+
+
+def _fetch_serpapi():
+    params = {
+        "engine": "ebay", "_nkw": config.SEARCH_QUERY, "ebay_domain": "ebay.com",
+        "_sop": "1", "LH_Auction": "1", "api_key": config.SERPAPI_KEY,
+    }
+    r = requests.get("https://serpapi.com/search.json", params=params, timeout=60)
+    r.raise_for_status()
+    j = r.json()
+    if j.get("error"):
+        raise RuntimeError("SerpApi: " + str(j["error"]))
+    now = dt.datetime.now(dt.timezone.utc)
+    out = []
+    for c in j.get("organic_results", []) or []:
+        bids = c.get("bids") or {}
+        secs = _parse_time_left(bids.get("time_left"))
+        end = ((now + dt.timedelta(seconds=secs)).isoformat().replace("+00:00", "Z")
+               if secs else "")
+        loc = (c.get("location") or "").lower()
+        country = "US" if "united states" in loc else ("XX" if loc else "")
+        sh = c.get("shipping")
+        if isinstance(sh, dict):
+            ship, raw = sh.get("extracted"), (sh.get("raw") or "")
+        else:
+            ship, raw = None, (sh or "")
+        if ship is None:
+            ship = 0.0 if "free" in str(raw).lower() else config.DEFAULT_SHIPPING
+        pr = c.get("price")
+        price = pr.get("extracted") if isinstance(pr, dict) else (pr if isinstance(pr, (int, float)) else 0)
+        out.append({
+            "item_id": str(c.get("product_id") or ""),
+            "title": c.get("title", ""),
+            "url": c.get("link", ""),
+            "image": c.get("thumbnail", ""),
+            "end_time": end,
+            "currency": "USD",
+            "current_bid": float(price or 0),
+            "bid_count": int(bids.get("count") or 0),
+            "shipping": float(ship),
+            "item_country": country,
+        })
+    return out
+
+
 def fetch_listings():
-    if config.MODE == "live":
-        return _fetch_live()
-    return _fetch_demo()
+    if config.MODE != "live":
+        return _fetch_demo()
+    if config.EBAY_PROVIDER == "serpapi":
+        return _fetch_serpapi()
+    return _fetch_live()
