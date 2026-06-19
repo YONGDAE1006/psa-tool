@@ -269,6 +269,7 @@ def _ppt(name, card_number, tcgplayer_id):
         "sales_week": round((psa10.get("dailyVolume7Day") or 0) * 7, 1),
         "matched_name": nm or None,
         "num_confirmed": num_confirmed,
+        "card_image": d.get("imageCdnUrl400") or d.get("imageCdnUrl"),  # 공식 카드 이미지(TCGplayer)
         "source": "pokemonpricetracker",
         "days": config.SOLD_DAYS,
     }

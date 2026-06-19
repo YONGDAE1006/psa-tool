@@ -168,6 +168,7 @@ def run():
             "value_confidence": value_conf,
             "matched_name": (sold.get("matched_name") if sold else None)
                             or (pc["product_name"] if pc else None),
+            "card_image": sold.get("card_image") if sold else None,
             "value_days": value_days,
             "value_updated": value_updated,
             "sales_week": sold.get("sales_week") if sold else None,

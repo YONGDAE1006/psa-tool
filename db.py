@@ -56,6 +56,7 @@ def init_db():
                 value_trend  TEXT,   -- 시세 추세 up/down/flat
                 value_confidence TEXT,-- 시세 신뢰도
                 matched_name TEXT,   -- 시세를 가져온 카드(검증용)
+                card_image   TEXT,   -- 공식 카드 이미지(TCGplayer)
                 value_days   INTEGER,-- 시세 기준 기간(일)
                 value_updated TEXT,  -- 시세 갱신 시각
                 sales_week   REAL,   -- 주당 판매량(환금성)
@@ -85,6 +86,7 @@ def init_db():
                 sales_week REAL,     -- 주당 판매량(환금성)
                 matched_name TEXT,   -- 시세를 가져온 카드(검증용)
                 num_confirmed INTEGER,-- 1=제목 카드번호로 매칭 확정, 0/NULL=미확정
+                card_image TEXT,     -- 공식 카드 이미지(TCGplayer)
                 source     TEXT,
                 fetched_at TEXT      -- ISO8601 UTC
             );
@@ -95,13 +97,17 @@ def init_db():
             conn.execute("ALTER TABLE sold_cache ADD COLUMN num_confirmed INTEGER")
         except sqlite3.OperationalError:
             pass
-        # 마이그레이션: 구버전 listings 에 셀러 컬럼 추가
+        # 마이그레이션: 구버전 listings 에 셀러/이미지 컬럼 추가
         for col, typ in (("seller_name", "TEXT"), ("seller_feedback", "INTEGER"),
-                         ("seller_pct", "REAL")):
+                         ("seller_pct", "REAL"), ("card_image", "TEXT")):
             try:
                 conn.execute(f"ALTER TABLE listings ADD COLUMN {col} {typ}")
             except sqlite3.OperationalError:
                 pass
+        try:
+            conn.execute("ALTER TABLE sold_cache ADD COLUMN card_image TEXT")
+        except sqlite3.OperationalError:
+            pass
 
 
 def get_sold_cache(query, max_age_hours):
@@ -126,6 +132,7 @@ def get_sold_cache(query, max_age_hours):
             "updated": row["updated"], "sales_week": row["sales_week"],
             "matched_name": row["matched_name"],
             "num_confirmed": row["num_confirmed"],
+            "card_image": row["card_image"],
             "source": row["source"], "days": None}
 
 
@@ -136,12 +143,12 @@ def save_sold_cache(query, data):
         conn.execute(
             """INSERT OR REPLACE INTO sold_cache
                (query, median, avg, n, all_time, trend, confidence, days_used, updated,
-                sales_week, matched_name, num_confirmed, source, fetched_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                sales_week, matched_name, num_confirmed, card_image, source, fetched_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (query, data["median"], data.get("avg"), data["n"], data.get("all_time"),
              data.get("trend"), data.get("confidence"), data.get("days_used"),
              data.get("updated"), data.get("sales_week"), data.get("matched_name"),
-             1 if data.get("num_confirmed") else 0,
+             1 if data.get("num_confirmed") else 0, data.get("card_image"),
              data["source"], now),
         )
 

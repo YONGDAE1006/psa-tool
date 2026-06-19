@@ -5,6 +5,7 @@
 종료임박순 eBay PSA10 매물 + PriceCharting 시세 비교 + 비딩 후보 하이라이트.
 """
 import datetime as dt
+import re
 
 import pandas as pd
 import streamlit as st
@@ -12,6 +13,11 @@ import streamlit as st
 import config
 import db
 import links
+
+
+def _upscale_img(url):
+    """eBay 썸네일 해상도 ↑ (s-l225 → s-l500). 깨짐 방지."""
+    return re.sub(r"s-l\d+", "s-l500", url) if url else url
 
 st.set_page_config(page_title="Pokemon PSA10 비딩 대시보드", layout="wide")
 
@@ -237,14 +243,17 @@ with tab1:
     for _, r in view.iterrows():
         ic, lbl = _BADGE.get(r["신호"], ("•", "관망"))
         with st.container(border=True):
-            cimg, cmain = st.columns([1, 6])
-            with cimg:
-                if r.get("image"):
-                    st.image(r["image"], use_container_width=True)
-            with cmain:
-                head = st.columns([8, 2])
-                head[0].markdown(f"#### {ic} {r['title']}")
-                head[1].markdown(
+            top = st.columns([1, 1, 5])
+            if r.get("image"):
+                top[0].image(_upscale_img(r["image"]), caption="실물(판매자)",
+                             use_container_width=True)
+            if r.get("card_image"):
+                top[1].image(r["card_image"], caption="공식(시세기준)",
+                             use_container_width=True)
+            with top[2]:
+                hc = st.columns([8, 2])
+                hc[0].markdown(f"#### {ic} {r['title']}")
+                hc[1].markdown(
                     f"<div style='text-align:right;padding-top:10px;color:#888'>⏳ <b>{r['남은시간']}</b></div>",
                     unsafe_allow_html=True)
                 _sfb = int(r.get("seller_feedback") or 0)
@@ -252,14 +261,16 @@ with tab1:
                           if _sfb < config.SELLER_FLAG_FEEDBACK else "")
                 st.caption(
                     f"신호 **{lbl}**  ·  👤 셀러 **{r.get('seller_name') or '-'}** "
-                    f"(리뷰 {_sfb} · {r.get('seller_pct') or 0:.0f}%){_swarn}")
-                m = st.columns(4)
-                m[0].metric("현재가", _money(r["current_bid"]))
-                m[1].metric("시세", _money(r["market_value"]),
-                            help=f"실낙찰 표본 {int(r['sold_n'] or 0)}건")
-                m[2].metric("권장 최대입찰", _money(r["max_bid"]))
-                m[3].metric("예상수익", _money(r["profit"]),
-                            help=(f"ROI {r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else None))
+                    f"(리뷰 {_sfb} · {r.get('seller_pct') or 0:.0f}%){_swarn}  "
+                    "·  📷 왼쪽 두 이미지(실물/공식)가 같은 카드인지 확인하세요")
+
+            m = st.columns(4)
+            m[0].metric("현재가", _money(r["current_bid"]))
+            m[1].metric("시세", _money(r["market_value"]),
+                        help=f"실낙찰 표본 {int(r['sold_n'] or 0)}건")
+            m[2].metric("권장 최대입찰", _money(r["max_bid"]))
+            m[3].metric("예상수익", _money(r["profit"]),
+                        help=(f"ROI {r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else None))
 
             _roi = f"**ROI {r['ROI%']:.0f}%**  ·  " if pd.notna(r.get("ROI%")) else ""
             st.markdown(
