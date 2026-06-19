@@ -211,6 +211,8 @@ with tab1:
     view = df.copy().sort_values("secs_left", na_position="last")
     if only_good:
         view = view[view["후보"]]
+    # 입찰 여지가 있는 것만: 현재가 < 권장최대입찰가. 이미 비싼(현재가≥권장) 매물은 제외.
+    view = view[view["max_bid"].notna() & (view["current_bid"] < view["max_bid"])]
 
     _sortby = st.radio("정렬", ["종료임박순", "ROI순", "예상수익순"],
                        horizontal=True, label_visibility="collapsed")
@@ -260,17 +262,19 @@ with tab1:
                 f"  ·  🔗 시세기준 카드: **{r.get('matched_name') or '-'}**")
 
             _num = links.ebay_item_number(r.get("url"), r.get("item_id"))
-            act = st.columns([2, 2, 2, 4])
+            c1, c2, c3, c4 = st.columns([2, 2, 2, 3])
             if r.get("url"):
-                act[0].link_button("🟢 eBay 매물", r["url"], use_container_width=True)
-            act[1].link_button("⏱ Gixen 열기", links.gixen_url(), use_container_width=True)
-            act[2].link_button("📊 시세검증", links.pricecharting_url(r.get("검색어") or r["title"]),
-                               use_container_width=True)
-            if pd.notna(r.get("max_bid")):
-                act[3].markdown(
-                    f"<div style='padding-top:8px;font-size:0.88em'>Gixen에 붙여넣기 → "
-                    f"번호 <code>{_num or '?'}</code> &nbsp; 입찰 <code>{r['max_bid']:.2f}</code></div>",
-                    unsafe_allow_html=True)
+                c1.link_button("🟢 eBay", r["url"], use_container_width=True)
+            c2.link_button("⏱ Gixen", links.gixen_url(), use_container_width=True)
+            c3.link_button("📊 시세검증", links.pricecharting_url(r.get("검색어") or r["title"]),
+                           use_container_width=True)
+            _mb = c4.number_input(
+                "내 최대입찰가($)", min_value=0.0, step=1.0,
+                value=float(round(r["max_bid"], 2)) if pd.notna(r.get("max_bid")) else 0.0,
+                key=f"bid_{r['item_id']}")
+            st.caption(
+                f"📋 Gixen 붙여넣기 → eBay번호 **{_num or '?'}** · 최대입찰 **${_mb:.2f}**  "
+                "(위 칸에서 직접 조절 — 권장값은 PPT 기준, 얇은 카드는 시세검증 보고 조정하세요)")
 
     st.markdown(
         f"🔎 추가 검증 도구: [130point]({links.point130_url()}) · "
