@@ -171,21 +171,25 @@ def _norm_num(s):
 
 # 여러 무료 키 순환: 현재 키가 429(일일한도 초과)면 다음 키로 넘어가 재시도.
 _key_idx = 0
+_last_req = [0.0]        # 마지막 요청 시각(페이싱용)
+_MIN_REQ_GAP = 1.2       # 요청 간 최소 간격(초). 분당 한도(60/min) 초과 방지 → ~50/min.
 
 
 def _ppt_get(url, params):
-    """PPT GET. 429를 구분 처리:
-       - 일일한도(Daily-Remaining=0) → 다음 키로 전환
-       - 분당한도 → 잠깐 쉬었다 같은 키 재시도
-       그 외 일시적 오류(401/403/5xx/네트워크)도 짧게 재시도. 끝내 실패 시 None."""
+    """PPT GET. ★사전 페이싱으로 분당 한도 초과(=429 폭증=키 차단)를 애초에 방지.
+       429 처리: 일일한도→다음 키 / 분당한도·차단→Retry-After 대기, 지속되면 다른 키.
+       PPT는 5분내 429 50회면 키 1시간 차단(반복시 24h→7d→영구) → 페이싱 필수."""
     global _key_idx
     keys = config.PPT_API_KEYS
     if not keys:
         return None
     n = len(keys)
-    minute_waits = 0
-    transient = 0
-    for _ in range(n + 6):            # 키 순회 + 재시도 여유
+    minute_waits = transient = 0
+    for _ in range(n + 8):
+        # 사전 페이싱: 직전 요청과 최소 간격 유지(몰아보내기 금지)
+        gap = _MIN_REQ_GAP - (time.monotonic() - _last_req[0])
+        if gap > 0:
+            time.sleep(gap)
         ki = _key_idx % n
         try:
             r = _session.get(
@@ -193,22 +197,32 @@ def _ppt_get(url, params):
                 params=params, timeout=30,
             )
         except requests.RequestException:
+            _last_req[0] = time.monotonic()
             transient += 1
             if transient > 3:
                 return None
             time.sleep(1.0)
             continue
+        _last_req[0] = time.monotonic()
         if r.status_code == 429:
             if r.headers.get("X-Ratelimit-Daily-Remaining") == "0":
-                _key_idx = (ki + 1) % n        # 오늘치 소진 → 다음 키
+                _key_idx = (ki + 1) % n          # 오늘치 소진 → 다음 키
+                minute_waits = 0
                 continue
-            if minute_waits < 6:               # 분당한도 → 잠깐 쉬고 같은 키
-                minute_waits += 1
-                time.sleep(2.0)
+            minute_waits += 1
+            if minute_waits > 3:                  # 분당한도/차단 지속 → 다른 키로 전환
+                _key_idx = (ki + 1) % n
+                minute_waits = 0
                 continue
-            return None
+            ra = r.headers.get("Retry-After")     # 권고 대기시간 존중
+            try:
+                delay = float(ra)
+            except (TypeError, ValueError):
+                delay = 5.0
+            time.sleep(min(max(delay, 2.0), 20.0))
+            continue
         if r.status_code in (401, 403, 500, 502, 503):
-            transient += 1                     # 일시적 → 짧게 재시도
+            transient += 1
             if transient > 3:
                 return None
             time.sleep(1.0)
