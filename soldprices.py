@@ -71,10 +71,13 @@ def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=Fa
         except Exception:
             return None
 
-    # 캐시 키: 카드 식별이 안정적인 PPT 검색문자열 (같은 카드의 다른 매물끼리 캐시 공유)
-    key = _ppt_query(title or query) or (query or "").strip()
-    if not key:
+    # 카드 이름(노이즈 제거) + 카드번호(#183 등)로 식별.
+    # 검색·캐시 모두 '이름+번호'로 묶어야 동명이카드(번호만 다른 카드) 혼선/캐시충돌 방지.
+    name = _ppt_query(title or query) or (query or "").strip()
+    if not name:
         return None
+    card_number = extract_card_number(title or query or "")
+    key = f"{name} #{card_number}" if card_number else name
 
     cached = db.get_sold_cache(key, config.SOLD_CACHE_HOURS)
     if cached is not None:
@@ -89,9 +92,9 @@ def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=Fa
 
     try:
         if provider == "pokemonpricetracker":
-            data = _ppt(key, tcgplayer_id)
+            data = _ppt(name, card_number, tcgplayer_id)
         elif provider == "ebay_insights":
-            data = _ebay_insights(key)
+            data = _ebay_insights(name)
         else:
             data = None
     except Exception:
@@ -137,6 +140,14 @@ def _demo(query, demo_hint):
 
 
 # ---------------- PokemonPriceTracker ----------------
+def _norm_num(s):
+    """카드번호 정규화: 앞자리 0 제거 + 소문자. '027'->'27', '#006'->'6', 'GG55'->'gg55'.
+    (eBay 제목은 '#027', PPT는 '27'로 저장 → 정규화 안 하면 같은 카드인데 불일치로 오제외)"""
+    s = (s or "").strip().lower()
+    m = re.match(r"([a-z]*)0*(\d+)", s)
+    return (m.group(1) + m.group(2)) if m else s
+
+
 # 여러 무료 키 순환: 현재 키가 429(일일한도 초과)면 다음 키로 넘어가 재시도.
 _key_idx = 0
 
@@ -162,13 +173,14 @@ def _ppt_get(url, params):
     return None                        # 모든 키 소진
 
 
-def _ppt(clean_query, tcgplayer_id):
+def _ppt(name, card_number, tcgplayer_id):
     if not config.PPT_API_KEYS:
         return None
     base = config.PPT_BASE_URL.rstrip("/")
 
+    num_confirmed = bool(tcgplayer_id)        # 외부에서 명시한 id면 신뢰
     if not tcgplayer_id:
-        tcgplayer_id = _ppt_resolve_id(clean_query, base)
+        tcgplayer_id, num_confirmed = _ppt_resolve_id(name, card_number, base)
     if not tcgplayer_id:
         return None
 
@@ -204,37 +216,61 @@ def _ppt(clean_query, tcgplayer_id):
         "updated": ebay.get("updatedAt") or ebay.get("lastEbayCheck"),
         "sales_week": round((psa10.get("dailyVolume7Day") or 0) * 7, 1),
         "matched_name": nm or None,
+        "num_confirmed": num_confirmed,
         "source": "pokemonpricetracker",
         "days": config.SOLD_DAYS,
     }
 
 
-def _ppt_resolve_id(clean_query, base):
-    """clean_query -> tcgPlayerId. id_cache 우선(영구), 없으면 검색 후 저장."""
-    cached = db.get_id_cache(clean_query)
+def _ppt_resolve_id(name, card_number, base):
+    """이름(+카드번호) -> (tcgPlayerId, num_confirmed).
+
+    - 번호가 있으면 '이름 번호'로 검색(예: 'Charizard ex 183') → 그 카드 1건을 정확히 집고
+      PPT cardNumber 일치로 확정(num_confirmed=True).
+    - 제목에 번호가 있는데 어떤 후보와도 번호가 안 맞으면 (None, False)
+      = 엉뚱한 카드를 가져오느니 차라리 버린다(오매칭 방지).
+    - 번호가 없으면 이름 유사도로만 고르되 미확정(False)으로 표시.
+    """
+    qn = _norm_num(card_number)                 # 비교/캐시용 정규화 번호('027'->'27')
+    cache_key = f"{name} #{qn}" if qn else name
+    cached = db.get_id_cache(cache_key)
     if cached:
-        return cached
-    r = _ppt_get(f"{base}/cards", {"search": clean_query, "limit": 3})
+        return cached, bool(qn)
+
+    # 검색은 제목에 적힌 원래 번호 그대로('023' 포함) → PPT 검색 recall 유지.
+    # (PPT 검색은 '023'으로도 그 카드를 찾음. 비교는 아래에서 정규화로 처리)
+    search_q = f"{name} {card_number}".strip() if qn else name
+    r = _ppt_get(f"{base}/cards", {"search": search_q, "limit": 6})
     if r is None:
-        return None
+        return None, False
     items = (r.json() or {}).get("data") or []
     if not isinstance(items, list) or not items:
-        return None
-    # 후보 중 검색문자열과 가장 잘 맞는 것 선택
-    q_num = extract_card_number(clean_query)
-    best, best_score = None, -1
+        return None, False
+
+    def cnum(it):
+        return _norm_num((it.get("cardNumber") or "").split("/")[0])
+
+    best, best_score, matched = None, -1.0, False
     for it in items:
         cand = f"{it.get('setName','')} {it.get('name','')}"
-        score = fuzz.token_set_ratio(clean_query, cand)
-        cnum = (it.get("cardNumber") or "").split("/")[0].lower()
-        if q_num and cnum and q_num.lower() == cnum:
-            score += 15
+        score = fuzz.token_set_ratio(name, cand)
+        c = cnum(it)
+        if qn and c:
+            if qn == c:
+                score += 50          # 번호 일치 = 강한 우선
+                matched = True
+            else:
+                score -= 30          # 번호 불일치 = 강한 페널티
         if score > best_score:
             best_score, best = score, it
+
+    # 제목에 번호가 있는데 어떤 후보와도 안 맞으면 = 엉뚱한 카드 위험 → 포기
+    if qn and not matched:
+        return None, False
     tid = best.get("tcgPlayerId") if best else None
     if tid:
-        db.save_id_cache(clean_query, tid)
-    return tid
+        db.save_id_cache(cache_key, tid)
+    return tid, (matched if qn else False)
 
 
 # ---------------- eBay Marketplace Insights (확장 슬롯) ----------------

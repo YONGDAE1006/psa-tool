@@ -120,8 +120,14 @@ def run():
             skipped["lowprofit"] += 1
             continue
 
-        # 신뢰도: 실낙찰가 기반이면(표본 충분) 신뢰, 추정가 기반이면 매칭 점수로 판단
-        reliable = (value_source == "sold") or (
+        # 신뢰도: 실낙찰가는 '제목의 카드번호로 매칭이 확정된 경우'에만 신뢰.
+        # (번호 확정 안 된 sold는 엉뚱한 카드일 수 있어 후보/알림/스틸에서 제외 → 대시보드엔 저신뢰로 노출)
+        # 추정가는 PriceCharting 매칭 점수로 판단.
+        num_confirmed = bool(sold and sold.get("num_confirmed"))
+        match_score = (100 if (value_source == "sold" and num_confirmed)
+                       else 30 if value_source == "sold"
+                       else score)
+        reliable = (value_source == "sold" and num_confirmed) or (
             value_source == "estimate" and score >= config.MIN_MATCH_SCORE)
 
         # 입찰 필터: 충족하면 표시. 부족해도 ROI가 아주 높고 신뢰되면(스틸) 예외 표시.
@@ -160,7 +166,7 @@ def run():
             "all_time_value": all_time_value,
             "market_value": market_value,
             "value_source": value_source,
-            "match_score": score,
+            "match_score": match_score,
             "cost": val["cost"],
             "net_resale": val["net_resale"],
             "profit": val["profit"],
@@ -204,7 +210,7 @@ def _notify_candidates(rows):
         return
     sent = 0
     for r in rows:
-        reliable = (r["value_source"] == "sold") or (
+        reliable = (r["value_source"] == "sold" and (r["match_score"] or 0) >= 90) or (
             r["value_source"] == "estimate" and (r["match_score"] or 0) >= config.MIN_MATCH_SCORE)
         is_cand = r["is_steal"] or (
             r["roi"] is not None and r["roi"] >= config.MIN_ROI and reliable)
