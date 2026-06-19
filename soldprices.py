@@ -247,12 +247,9 @@ def _ppt(name, card_number, tcgplayer_id):
     if not n or current is None:
         return None
     current = float(current)
-    # 상승추세인데 90일가중(smart)이 최근 거래를 못 따라가면(얇은카드 흔함)
-    # priceHistory 최근 30일 중앙값으로 보정. 단 스파이크 방지로 상한 배수까지만.
-    if (psa10.get("marketTrend") or "flat") == "up":
-        recent = _recent_median((ebay.get("priceHistory") or {}).get("psa10") or {}, 30)
-        if recent and recent > current:
-            current = min(recent, current * config.MAX_RECENT_MULT)
+    # (이전의 priceHistory '최근가 보정'은 얇은 카드에서 단일 outlier를 잡아 과대평가하는
+    #  문제로 제거. 이제 smartMarketPrice(PPT 필터·가중값) 그대로 사용. 얇은 카드는
+    #  PriceCharting 시세검증으로 사용자가 직접 확인/조정.)
     # 어떤 카드의 시세를 가져왔는지(검증용)
     nm = " ".join(str(x) for x in [d.get("name"), d.get("cardNumber")] if x).strip()
     if d.get("setName"):

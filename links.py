@@ -32,14 +32,17 @@ def verify_query(matched_name, title=""):
     예: matched_name 'Buzzwole GX SV68/SV94 · Hidden Fates: Shiny Vault' → 'Buzzwole GX SV68'."""
     if matched_name:
         left = matched_name.split("·")[0].replace("-", " ")
+        left = re.sub(r"\([^)]*\)", " ", left)       # '(Secret)' 등 괄호 내용 제거
         name_toks, num = [], None
         for t in left.split():
             if re.match(r"^[A-Za-z]{0,3}\d", t):     # 카드번호 토큰(SV68/SV94, 183/165, GG55, 024)
                 num = t.split("/")[0]                # 첫 부분만(SV68/SV94 → SV68)
                 break
+            if t.lower() in ("gx", "ex", "v", "vmax", "vstar"):  # 등급/타입 접미사 제거
+                continue
             name_toks.append(t)
         if name_toks:
-            base = " ".join(name_toks) + (f" {num}" if num else "")
+            base = " ".join(name_toks) + (f" #{num}" if num else "")   # 'Pikachu #160' 형식
             return re.sub(r"\s+", " ", base).strip()
     return re.sub(r"\s+", " ", (title or "")).strip()
 
