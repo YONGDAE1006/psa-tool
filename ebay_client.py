@@ -54,6 +54,11 @@ def _fetch_live():
         "Authorization": f"Bearer {token}",
         "X-EBAY-C-MARKETPLACE-ID": config.EBAY_MARKETPLACE,
     }
+    # 수취지 ZIP을 알려주면 '계산식 배송비'가 그 목적지 기준으로 채워짐(없으면 일부 매물 배송비 빔).
+    if config.EBAY_SHIP_ZIP:
+        headers["X-EBAY-C-ENDUSERCTX"] = (
+            f"contextualLocation=country%3DUS%2Czip%3D{config.EBAY_SHIP_ZIP}"
+        )
     # 경매만 + (설정 시) 미국 내 매물만
     filt = "buyingOptions:{AUCTION}"
     if config.ITEM_LOCATION_COUNTRY:

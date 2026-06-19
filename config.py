@@ -22,6 +22,9 @@ SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID", "")
 EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET", "")
 EBAY_MARKETPLACE = os.getenv("EBAY_MARKETPLACE", "EBAY_US")
+# 수취지 미국 ZIP. eBay 계산식 배송비를 이 목적지 기준으로 정확히 받기 위함.
+# (없으면 일부 매물 배송비가 비어 DEFAULT_SHIPPING으로 떨어짐). PSA창고/본인 미국주소 ZIP.
+EBAY_SHIP_ZIP = os.getenv("EBAY_SHIP_ZIP", "19720")
 SEARCH_QUERY = os.getenv("SEARCH_QUERY", "pokemon psa10")  # 붙여써야 PSA10만 정확히 잡힘
 SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "100"))  # 한 번에 가져올 매물 수
 
