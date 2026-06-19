@@ -87,12 +87,11 @@ def run():
             all_time_value = sold.get("all_time")
             value_days = sold.get("days_used")
             value_updated = sold.get("updated")
-            # 최근 데이터가 짧은데(<30일) 신뢰도까지 낮으면(=거래 드물어 들쭉날쭉)
-            # 장기 중앙값으로 보수 보정. (거래 많은 카드의 7일 시세는 신뢰 high라 그대로 사용)
-            short_unreliable = (value_days is not None
-                                and value_days < config.MIN_VALUE_DAYS
-                                and value_conf != "high")
-            if (value_conf == "low" or short_unreliable) and all_time_value:
+            # ★시세 기준 = '진짜 평균'(입찰 안전). 현재시세(smartMarketPrice 7일창)가
+            #   장기 median(medianPrice, 수백 표본)보다 높으면 = 최근 거품 → 장기 median으로
+            #   끌어내려 보수 평가. 신상이라 현재<장기면(런칭거품 빠지는 중) 현재값 유지.
+            #   즉 min(현재, 장기) = 둘 중 낮은 값. (예: Stakataka 현$110 vs 역대$60 → $60 사용)
+            if all_time_value:
                 current_value = min(current_value, all_time_value)
             # 하락 추세면 추가 할인
             if value_trend == "down":
