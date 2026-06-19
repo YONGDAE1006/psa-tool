@@ -137,12 +137,33 @@ def _demo(query, demo_hint):
 
 
 # ---------------- PokemonPriceTracker ----------------
-def _headers():
-    return {"Authorization": f"Bearer {config.PPT_API_KEY}"}
+# 여러 무료 키 순환: 현재 키가 429(일일한도 초과)면 다음 키로 넘어가 재시도.
+_key_idx = 0
+
+
+def _ppt_get(url, params):
+    """PPT GET. 키가 일일한도(429)면 다음 키로 자동 전환. 모든 키 소진 시 None."""
+    global _key_idx
+    keys = config.PPT_API_KEYS
+    if not keys:
+        return None
+    n = len(keys)
+    for _ in range(n):
+        ki = _key_idx % n
+        r = _session.get(
+            url, headers={"Authorization": f"Bearer {keys[ki]}"},
+            params=params, timeout=30,
+        )
+        if r.status_code == 429:      # 이 키 오늘치 소진 → 다음 키
+            _key_idx = (ki + 1) % n
+            continue
+        r.raise_for_status()
+        return r
+    return None                        # 모든 키 소진
 
 
 def _ppt(clean_query, tcgplayer_id):
-    if not config.PPT_API_KEY:
+    if not config.PPT_API_KEYS:
         return None
     base = config.PPT_BASE_URL.rstrip("/")
 
@@ -151,12 +172,12 @@ def _ppt(clean_query, tcgplayer_id):
     if not tcgplayer_id:
         return None
 
-    r = _session.get(
-        f"{base}/cards", headers=_headers(),
-        params={"tcgPlayerId": tcgplayer_id, "includeEbay": "true", "days": config.SOLD_DAYS},
-        timeout=30,
+    r = _ppt_get(
+        f"{base}/cards",
+        {"tcgPlayerId": tcgplayer_id, "includeEbay": "true", "days": config.SOLD_DAYS},
     )
-    r.raise_for_status()
+    if r is None:
+        return None
     data = (r.json() or {}).get("data")
     d = (data[0] if isinstance(data, list) else data) or {}
     ebay = d.get("ebay") or {}
@@ -193,11 +214,9 @@ def _ppt_resolve_id(clean_query, base):
     cached = db.get_id_cache(clean_query)
     if cached:
         return cached
-    r = _session.get(
-        f"{base}/cards", headers=_headers(),
-        params={"search": clean_query, "limit": 3}, timeout=30,
-    )
-    r.raise_for_status()
+    r = _ppt_get(f"{base}/cards", {"search": clean_query, "limit": 3})
+    if r is None:
+        return None
     items = (r.json() or {}).get("data") or []
     if not isinstance(items, list) or not items:
         return None

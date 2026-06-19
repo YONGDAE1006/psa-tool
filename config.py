@@ -94,7 +94,10 @@ SOLD_CACHE_HOURS = int(os.getenv("SOLD_CACHE_HOURS", "24"))
 # 1회 수집에서 '새로' 조회할 최대 카드 수 (나머지는 캐시만 사용). 무료 등급 보호용.
 SOLD_LOOKUP_LIMIT = int(os.getenv("SOLD_LOOKUP_LIMIT", "25"))
 # PokemonPriceTracker
-PPT_API_KEY = os.getenv("PPT_API_KEY", "")
+# PPT_API_KEY 는 콤마로 여러 무료 키를 넣을 수 있음. 하나가 일일한도(429)에 걸리면
+# soldprices 가 자동으로 다음 키로 전환(무료 100/일을 키 수만큼 확보). 유료키면 1개만.
+PPT_API_KEYS = [k.strip() for k in os.getenv("PPT_API_KEY", "").split(",") if k.strip()]
+PPT_API_KEY = PPT_API_KEYS[0] if PPT_API_KEYS else ""  # 호환용(첫 키)
 PPT_BASE_URL = os.getenv("PPT_BASE_URL", "https://www.pokemonpricetracker.com/api/v2")
 
 # ---------- 가치 판단(밸류에이션) 파라미터 ----------
