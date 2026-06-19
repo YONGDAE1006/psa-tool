@@ -90,7 +90,10 @@ PC_PSA10_FIELD = PC_GRADE_FIELDS["psa10"]
 # ebay_insights        : eBay Marketplace Insights API (승인 필요, 무료)
 SOLD_PROVIDER = os.getenv("SOLD_PROVIDER", "demo").strip().lower()
 SOLD_DAYS = int(os.getenv("SOLD_DAYS", "90"))      # 최근 며칠 낙찰 집계
-MIN_SOLD_COUNT = int(os.getenv("MIN_SOLD_COUNT", "3"))  # 이 건수 이상이면 실낙찰가 신뢰
+MIN_SOLD_COUNT = int(os.getenv("MIN_SOLD_COUNT", "3"))  # 이 건수 이상이면 실낙찰가 '표시'
+# 이 건수 이상 + confidence가 low가 아니어야 시세를 '신뢰'(후보/알림/스틸 대상).
+# 미만이면 대시보드엔 보이되 ⚠️저신뢰로 표시하고 자동알림/스틸에서 제외(수동 검증 유도).
+CONFIDENT_SOLD_COUNT = int(os.getenv("CONFIDENT_SOLD_COUNT", "12"))
 # --- 무료 등급 크레딧 절약 ---
 # 같은 카드를 이 시간(시간) 안에는 다시 조회하지 않고 캐시 사용 (시세는 빨리 안 변함)
 SOLD_CACHE_HOURS = int(os.getenv("SOLD_CACHE_HOURS", "24"))

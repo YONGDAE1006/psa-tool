@@ -87,13 +87,10 @@ def run():
             all_time_value = sold.get("all_time")
             value_days = sold.get("days_used")
             value_updated = sold.get("updated")
-            # ★시세 기준 = '진짜 평균'(입찰 안전). 현재시세(smartMarketPrice 7일창)가
-            #   장기 median(medianPrice, 수백 표본)보다 높으면 = 최근 거품 → 장기 median으로
-            #   끌어내려 보수 평가. 신상이라 현재<장기면(런칭거품 빠지는 중) 현재값 유지.
-            #   즉 min(현재, 장기) = 둘 중 낮은 값. (예: Stakataka 현$110 vs 역대$60 → $60 사용)
-            if all_time_value:
-                current_value = min(current_value, all_time_value)
-            # 하락 추세면 추가 할인
+            # 시세 = smartMarketPrice 그대로. PPT가 적응형으로 산출(거래 많으면 14일·적으면 90일
+            # 창 자동 선택 + 이상치 필터 + 최근 가중) → '상승해서 굳은 가격'을 제대로 반영.
+            # (역대 medianPrice로 끌어내리면 옛 싼거래에 저평가됨 = 상승카드를 못 사게 됨)
+            # 표본 부족/저신뢰는 아래 sold_reliable 에서 따로 걸러냄(min 강제할인 폐기).
             if value_trend == "down":
                 current_value *= config.TREND_DOWN_FACTOR
             market_value = round(current_value, 2)
@@ -123,10 +120,15 @@ def run():
         # (번호 확정 안 된 sold는 엉뚱한 카드일 수 있어 후보/알림/스틸에서 제외 → 대시보드엔 저신뢰로 노출)
         # 추정가는 PriceCharting 매칭 점수로 판단.
         num_confirmed = bool(sold and sold.get("num_confirmed"))
-        match_score = (100 if (value_source == "sold" and num_confirmed)
+        # 표본 충분 + confidence low 아님 → 시세 신뢰. (얇은 카드 시세는 못 믿음)
+        enough_sample = bool(sold and (sold.get("n") or 0) >= config.CONFIDENT_SOLD_COUNT
+                             and (sold.get("confidence") or "") != "low")
+        sold_reliable = num_confirmed and enough_sample
+        match_score = (100 if (value_source == "sold" and sold_reliable)
+                       else 40 if (value_source == "sold" and num_confirmed)  # 맞는 카드지만 표본부족=저신뢰
                        else 30 if value_source == "sold"
                        else score)
-        reliable = (value_source == "sold" and num_confirmed) or (
+        reliable = (value_source == "sold" and sold_reliable) or (
             value_source == "estimate" and score >= config.MIN_MATCH_SCORE)
 
         # 입찰 필터: 충족하면 표시. 부족해도 ROI가 아주 높고 신뢰되면(스틸) 예외 표시.
