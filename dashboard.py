@@ -212,114 +212,70 @@ with tab1:
     if only_good:
         view = view[view["후보"]]
 
-    show = view[[
-        "신호", "Gixen", "남은시간", "title", "셀러", "current_bid", "max_bid",
-        "ROI%", "profit", "추세", "market_value", "all_time_value", "sold_n",
-        "matched_name", "bid_count", "shipping", "url", "sold_url",
-    ]].rename(columns={
-        "title": "eBay 제목", "current_bid": "현재가($)", "max_bid": "권장최대입찰가($)",
-        "profit": "예상수익($)", "market_value": "시세($)", "all_time_value": "역대시세($)",
-        "sold_n": "표본", "matched_name": "시세카드(검증)", "bid_count": "입찰수",
-        "shipping": "배송비($)", "url": "매물", "sold_url": "낙찰가검증",
-    })
+    _sortby = st.radio("정렬", ["종료임박순", "ROI순", "예상수익순"],
+                       horizontal=True, label_visibility="collapsed")
+    if _sortby == "ROI순":
+        view = view.sort_values("roi", ascending=False, na_position="last")
+    elif _sortby == "예상수익순":
+        view = view.sort_values("profit", ascending=False, na_position="last")
 
-    st.caption("👇 **행을 클릭**하면 아래 상세가 나옵니다 · 열 제목 클릭=정렬")
-    event = st.dataframe(
-        show, use_container_width=True, hide_index=True,
-        on_select="rerun", selection_mode="single-row",
-        column_config={
-            "신호": st.column_config.TextColumn("신호", help="🟢후보 / 🔥스틸"),
-            "셀러": st.column_config.TextColumn(
-                "셀러", help="셀러ID (리뷰수). ⚠️=리뷰 적음 → 신규/저평판 셀러 사기 주의"),
-            "Gixen": st.column_config.LinkColumn(
-                "Gixen", display_text="⏱등록",
-                help="클릭→Gixen에 eBay번호·권장입찰가 자동입력. Add는 검토 후 직접 누르세요."),
-            "매물": st.column_config.LinkColumn("매물", display_text="eBay"),
-            "낙찰가검증": st.column_config.LinkColumn(
-                "낙찰가검증", display_text="실거래", help="이 카드의 eBay 실제 낙찰가(Sold)"),
-            "시세카드(검증)": st.column_config.TextColumn(
-                "시세카드(검증)", help="시세를 가져온 카드. eBay 제목과 다르면 매칭 오류!"),
-            "예상수익($)": st.column_config.NumberColumn(format="%.0f"),
-            "권장최대입찰가($)": st.column_config.NumberColumn(
-                "권장최대입찰가($)", format="%.0f",
-                help="eBay '최대 입찰가'에 넣으면 목표 수익 남기는 선까지만 자동 입찰"),
-            "배송비($)": st.column_config.NumberColumn(format="%.2f"),
-            "시세($)": st.column_config.NumberColumn(
-                "시세($)", format="%.0f", help="ROI 계산 기준 현재 시세(최근 가중·위험 보정)"),
-            "역대시세($)": st.column_config.NumberColumn(
-                "역대시세($)", format="%.0f", help="역대 중앙값. 현재<역대=저점 / 현재>역대=추격 주의"),
-            "표본": st.column_config.NumberColumn("표본", help="실낙찰 건수(많을수록 신뢰↑)"),
-            "추세": st.column_config.TextColumn(
-                "추세", help="📈상승/📉하락 · ⚠️신상/하락 · 신뢰↓"),
-            "현재가($)": st.column_config.NumberColumn(format="%.2f"),
-            "ROI%": st.column_config.NumberColumn(format="%.1f%%"),
-        },
+    st.caption(
+        f"📡 종료임박 경매(약 6시간 내 종료분)에서 추린 후보 **{len(view)}건**. "
+        "조기경매는 종료 직전 가격이 오르니 **권장 최대입찰가**까지만 Gixen에 걸어두세요."
     )
+    if view.empty:
+        st.info("지금 조건에 맞는 후보가 없습니다. (PSA10 차익 기회는 원래 드물어요)")
+
+    def _money(v, dec=0):
+        return f"${v:,.{dec}f}" if pd.notna(v) else "-"
+
+    _BADGE = {"🟢 후보": ("🟢", "후보"), "🔥 스틸": ("🔥", "스틸"),
+              "⚠️ 저신뢰": ("⚠️", "저신뢰·표본부족")}
+
+    for _, r in view.iterrows():
+        ic, lbl = _BADGE.get(r["신호"], ("•", "관망"))
+        with st.container(border=True):
+            head = st.columns([8, 2])
+            head[0].markdown(f"#### {ic} {r['title']}")
+            head[1].markdown(
+                f"<div style='text-align:right;padding-top:12px;color:#888'>⏳ <b>{r['남은시간']}</b></div>",
+                unsafe_allow_html=True)
+
+            _sfb = int(r.get("seller_feedback") or 0)
+            _swarn = ("  ·  ⚠️ **신규/저평판 셀러 — 사기(가짜슬랩·미발송) 주의**"
+                      if _sfb < config.SELLER_FLAG_FEEDBACK else "")
+            st.caption(
+                f"신호 **{lbl}**  ·  👤 셀러 **{r.get('seller_name') or '-'}** "
+                f"(리뷰 {_sfb} · {r.get('seller_pct') or 0:.0f}%){_swarn}")
+
+            m = st.columns(4)
+            m[0].metric("현재가", _money(r["current_bid"]))
+            m[1].metric("권장 최대입찰", _money(r["max_bid"]))
+            m[2].metric("ROI", f"{r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else "-")
+            m[3].metric("예상수익", _money(r["profit"]))
+
+            st.caption(
+                f"시세 **{_money(r['market_value'])}** (표본 {int(r['sold_n'] or 0)}건 · 역대 {_money(r['all_time_value'])})"
+                f"  ·  배송 {_money(r['shipping'], 2)}  ·  {r['추세'] or ''}  ·  손익분기 {_money(r['breakeven_bid'])}"
+                f"  ·  🔗 시세기준 카드: **{r.get('matched_name') or '-'}**")
+
+            _num = links.ebay_item_number(r.get("url"), r.get("item_id"))
+            act = st.columns([2, 2, 2, 4])
+            if r.get("url"):
+                act[0].link_button("🟢 eBay 매물", r["url"], use_container_width=True)
+            act[1].link_button("⏱ Gixen 열기", links.gixen_url(), use_container_width=True)
+            act[2].link_button("📊 시세검증", links.pricecharting_url(r.get("검색어") or r["title"]),
+                               use_container_width=True)
+            if pd.notna(r.get("max_bid")):
+                act[3].markdown(
+                    f"<div style='padding-top:8px;font-size:0.88em'>Gixen에 붙여넣기 → "
+                    f"번호 <code>{_num or '?'}</code> &nbsp; 입찰 <code>{r['max_bid']:.2f}</code></div>",
+                    unsafe_allow_html=True)
 
     st.markdown(
-        f"🔎 추가 검증: [130point]({links.point130_url()}) · "
+        f"🔎 추가 검증 도구: [130point]({links.point130_url()}) · "
         f"[PSA APR]({links.psa_apr_url()}) · [alt.xyz]({links.alt_url()})"
     )
-
-    st.divider()
-    st.subheader("🔍 카드 상세")
-    _selrows = event.selection.rows if event and event.selection else []
-    if not _selrows:
-        st.info("위 표에서 카드 행을 클릭하세요.")
-    else:
-        r = view.iloc[_selrows[0]]
-
-        def _m(v, p="$"):
-            return f"{p}{v:,.0f}" if v is not None and not pd.isna(v) else "-"
-
-        st.markdown(f"### {r['title']}")
-        if r.get("matched_name"):
-            st.caption(f"🔗 시세 기준 카드: **{r['matched_name']}** (eBay 제목과 다르면 매칭 오류일 수 있음)")
-        _sfb = int(r.get("seller_feedback") or 0)
-        _swarn = " ⚠️ **신규/저평판 셀러 — 사기 주의**(가짜 슬랩·미발송 위험)" if _sfb < config.SELLER_FLAG_FEEDBACK else ""
-        st.caption(f"👤 셀러 **{r.get('seller_name') or '-'}** · 리뷰 {_sfb}건 · {r.get('seller_pct') or 0:.0f}% 긍정{_swarn}")
-        a, b, c, d = st.columns(4)
-        a.metric("현재시세", _m(r["market_value"]))
-        b.metric("역대중앙값", _m(r["all_time_value"]))
-        c.metric("권장최대입찰가", _m(r["max_bid"]))
-        roi_txt = f"ROI {r['ROI%']:.0f}%" if pd.notna(r["ROI%"]) else ""
-        d.metric("예상수익", _m(r["profit"]), roi_txt)
-
-        vd = f"기준 {int(r['value_days'])}일 · " if pd.notna(r.get("value_days")) else ""
-        st.caption(
-            f"추세 {r['추세'] or '-'} · 신뢰도 {r.get('value_confidence') or '-'} · "
-            f"{vd}갱신 {_fresh(r.get('value_updated')) or '-'} · 낙찰표본 {int(r['sold_n'] or 0)}건 · "
-            f"환금성 주 {r.get('sales_week') if pd.notna(r.get('sales_week')) else '-'}장 · "
-            f"현재가 {_m(r['current_bid'])} · 손익분기 {_m(r['breakeven_bid'])}"
-        )
-
-        if pd.notna(r["market_value"]) and pd.notna(r["all_time_value"]):
-            st.bar_chart(
-                pd.DataFrame({"시세($)": [r["market_value"], r["all_time_value"]]},
-                             index=["현재", "역대중앙"]), height=200)
-
-        st.markdown(
-            f"📊 **전체/1년 그래프 + 등급별 시세 + 개별 낙찰내역 →** "
-            f"[PriceCharting]({links.pricecharting_url(r['검색어'])}) · "
-            f"[eBay 낙찰가]({r['sold_url']}) · [130point]({links.point130_url()})"
-        )
-        st.caption("※ 대시보드 안 실시간 그래프/낙찰표는 PPT 유료($10/월) 필요. 무료에선 위 링크로 확인.")
-
-        # ⏱ Gixen 스나이핑 등록 도우미: eBay 번호 + 권장입찰가(배송 반영)를 복사해 Gixen에 붙여넣기
-        st.divider()
-        _num = links.ebay_item_number(r.get("url"), r.get("item_id"))
-        st.markdown(
-            f"⏱ **Gixen 스나이핑 등록** — [Gixen 모바일 열기]({links.gixen_url()}) 후 "
-            f"아래 두 값을 붙여넣으세요 (각 칸 우측 복사 아이콘):"
-        )
-        _g1, _g2 = st.columns(2)
-        with _g1:
-            st.caption("① eBay 아이템 번호")
-            st.code(_num or "추출 실패", language=None)
-        with _g2:
-            st.caption("② 최대 입찰가 ($, 배송비 이미 반영)")
-            st.code(f"{r['max_bid']:.2f}" if pd.notna(r.get("max_bid")) else "-", language=None)
-        st.caption("Gixen이 종료 직전 이 금액까지만 자동 입찰 → 넘으면 입찰 안 함(과입찰/손해 방지).")
 
 # ============== 탭 2: 인기·거래량 ==============
 with tab2:
