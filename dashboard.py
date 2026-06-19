@@ -99,8 +99,6 @@ df["비고"] = df["비고"].apply(lambda x: "🔥스틸" if x else "")
 def _trend_str(r):
     t = {"up": "📈", "down": "📉", "flat": "➖"}.get(r.get("value_trend"), "")
     flags = []
-    if r.get("value_confidence") == "low":
-        flags.append("신뢰↓")
     at, mv = r.get("all_time_value"), r.get("market_value")
     if at and mv and mv < at * config.DROP_FLAG_RATIO:
         flags.append("⚠️신상/하락")
@@ -112,23 +110,29 @@ def _trend_str(r):
 df["추세"] = df.apply(_trend_str, axis=1)
 
 # 비딩 후보 판정
+def _in_window(r):
+    return (r["roi"] is not None and r["roi"] >= min_roi
+            and r["secs_left"] is not None and 0 < r["secs_left"] <= max_hours * 3600)
+
 def good(r):
-    # 신뢰도: 실낙찰가 기반이면 신뢰, 추정가 기반이면 매칭 점수로 판단
-    reliable = (r.get("value_source") == "sold") or (
-        r["match_score"] is not None and r["match_score"] >= min_score)
-    return (
-        r["roi"] is not None and r["roi"] >= min_roi
-        and reliable
-        and r["secs_left"] is not None and 0 < r["secs_left"] <= max_hours * 3600
-    )
+    # 신뢰도: sold는 번호확정+표본충분(match_score≥90)이어야 신뢰. 추정가는 매칭 점수로.
+    reliable = (r.get("value_source") == "sold" and (r["match_score"] or 0) >= 90) or (
+        r.get("value_source") == "estimate" and (r["match_score"] or 0) >= min_score)
+    return _in_window(r) and reliable
 
 df["후보"] = df.apply(good, axis=1)
 
-# 신호 컬럼(후보/스틸 강조)
-df["신호"] = df.apply(
-    lambda r: "🔥 스틸" if r["비고"] == "🔥스틸" else ("🟢 후보" if r["후보"] else ""),
-    axis=1,
-)
+# 신호 컬럼: 🔥스틸 / 🟢후보 / ⚠️저신뢰(시세는 있지만 표본부족·미확정→수동검증)
+def _signal(r):
+    if r["비고"] == "🔥스틸":
+        return "🔥 스틸"
+    if r["후보"]:
+        return "🟢 후보"
+    if r.get("value_source") == "sold" and _in_window(r):
+        return "⚠️ 저신뢰"   # 표본 부족/매칭 미확정 → PriceCharting 등으로 직접 확인
+    return ""
+
+df["신호"] = df.apply(_signal, axis=1)
 
 
 def _fresh(updated):
