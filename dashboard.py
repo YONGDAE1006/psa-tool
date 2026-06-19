@@ -273,6 +273,9 @@ with tab1:
                     f"신호 **{lbl}**  ·  👤 셀러 **{r.get('seller_name') or '-'}** "
                     f"(리뷰 {_sfb} · {r.get('seller_pct') or 0:.0f}%){_swarn}  "
                     "·  📷 왼쪽 두 이미지(실물/공식)가 같은 카드인지 확인하세요")
+                st.toggle("⏱ Gixen 등록 완료 (켜두면 새로고침해도 유지)",
+                          value=(r["item_id"] in _gx_marks), key=f"gx_{r['item_id']}",
+                          on_change=_toggle_gixen, args=(r["item_id"],))
 
             m = st.columns(4)
             m[0].metric("현재가", _money(r["current_bid"]))
@@ -304,9 +307,6 @@ with tab1:
             st.markdown(
                 f"📋 Gixen 붙여넣기 → eBay번호 `{_num or '?'}` · 최대입찰 `${_mb:.2f}` "
                 "— 위 칸에서 직접 조절(얇은 카드는 시세검증 보고)")
-            st.checkbox("✅ Gixen 등록 완료 (체크는 새로고침해도 유지됨)",
-                        value=(r["item_id"] in _gx_marks), key=f"gx_{r['item_id']}",
-                        on_change=_toggle_gixen, args=(r["item_id"],))
 
     st.markdown(
         f"🔎 추가 검증 도구: [130point]({links.point130_url()}) · "
