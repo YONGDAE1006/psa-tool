@@ -47,6 +47,22 @@ def gixen_url():
     return config.GIXEN_URL
 
 
+def gixen_snipe_url(item_number, max_bid=None):
+    """Gixen add-snipe 프리필 URL: itemid(=eBay번호)·maxbid(=권장입찰가) 자동입력.
+    번호 없으면 None. (Add 버튼은 사용자가 직접 누름)"""
+    if not item_number:
+        return None
+    params = {"itemid": str(item_number)}
+    try:
+        if max_bid is not None and float(max_bid) == float(max_bid):  # NaN 아님
+            params["maxbid"] = f"{float(max_bid):.2f}"
+    except (TypeError, ValueError):
+        pass
+    base = config.GIXEN_URL
+    sep = "&" if "?" in base else "?"
+    return base + sep + urllib.parse.urlencode(params)
+
+
 def ebay_item_number(url, item_id=""):
     """Gixen 등록에 쓰는 eBay 숫자 아이템 번호 추출."""
     m = re.search(r"/itm/(?:[^/]*/)?(\d{9,15})", url or "")

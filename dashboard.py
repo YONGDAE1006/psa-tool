@@ -134,6 +134,13 @@ def _signal(r):
 
 df["신호"] = df.apply(_signal, axis=1)
 
+# Gixen 스나이프 프리필 링크(eBay번호+권장입찰가 자동입력). 행에서 바로 클릭.
+df["Gixen"] = df.apply(
+    lambda r: links.gixen_snipe_url(
+        links.ebay_item_number(r.get("url"), r.get("item_id")), r.get("max_bid")),
+    axis=1,
+)
+
 
 def _fresh(updated):
     if not updated:
@@ -196,7 +203,7 @@ with tab1:
         view = view[view["후보"]]
 
     show = view[[
-        "신호", "남은시간", "title", "current_bid", "max_bid",
+        "신호", "Gixen", "남은시간", "title", "current_bid", "max_bid",
         "ROI%", "profit", "추세", "market_value", "all_time_value", "sold_n",
         "matched_name", "bid_count", "shipping", "url", "sold_url",
     ]].rename(columns={
@@ -212,6 +219,9 @@ with tab1:
         on_select="rerun", selection_mode="single-row",
         column_config={
             "신호": st.column_config.TextColumn("신호", help="🟢후보 / 🔥스틸"),
+            "Gixen": st.column_config.LinkColumn(
+                "Gixen", display_text="⏱등록",
+                help="클릭→Gixen에 eBay번호·권장입찰가 자동입력. Add는 검토 후 직접 누르세요."),
             "매물": st.column_config.LinkColumn("매물", display_text="eBay"),
             "낙찰가검증": st.column_config.LinkColumn(
                 "낙찰가검증", display_text="실거래", help="이 카드의 eBay 실제 낙찰가(Sold)"),
