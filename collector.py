@@ -198,6 +198,25 @@ def run():
 
         out.append(row)
 
+    # Gixen 등록한 매물은 이번 종료임박 순위에서 밀려났어도(또는 일시적으로 빠져도)
+    # 아직 안 끝났으면 유지 — 등록한 걸 추적할 수 있게.
+    marked = db.get_gixen_marks()
+    if marked:
+        new_ids = {r["item_id"] for r in out}
+        nowts = dt.datetime.now(dt.timezone.utc)
+        for old in db.get_listings():
+            iid = old.get("item_id")
+            if iid in marked and iid not in new_ids:
+                try:
+                    ends = dt.datetime.fromisoformat((old.get("end_time") or "").replace("Z", "+00:00"))
+                except ValueError:
+                    ends = None
+                if ends and ends > nowts:          # 아직 안 끝난 것만
+                    out.append(dict(old))
+    if out:                                        # 모든 행 동일 컬럼으로 정렬
+        keyset = list(out[0].keys())
+        out = [{k: r.get(k) for k in keyset} for r in out]
+
     db.replace_listings(out)
     _notify_candidates(out)
     _notify_risky(alert_rows)

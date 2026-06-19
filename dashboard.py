@@ -225,10 +225,12 @@ with tab1:
     view = df.copy().sort_values("secs_left", na_position="last")
     if only_good:
         view = view[view["후보"]]
-    # 입찰 여지가 있는 것만: 현재가 < 권장최대입찰가. 이미 비싼(현재가≥권장) 매물은 제외.
-    view = view[view["max_bid"].notna() & (view["current_bid"] < view["max_bid"])]
-
     _gx_marks = db.get_gixen_marks()   # Gixen 등록 체크(영구 저장)
+    # 입찰 여지 있는 것(현재가<권장) + Gixen 등록한 것(추적용)은 항상 표시.
+    view = view[
+        (view["max_bid"].notna() & (view["current_bid"] < view["max_bid"]))
+        | view["item_id"].isin(_gx_marks)
+    ]
     if _gx_marks and st.checkbox(f"☑️ Gixen 등록한 {len(_gx_marks)}건 숨기기 (남은 것만 보기)"):
         view = view[~view["item_id"].isin(_gx_marks)]
 
