@@ -280,6 +280,22 @@ with tab1:
         )
         st.caption("※ 대시보드 안 실시간 그래프/낙찰표는 PPT 유료($10/월) 필요. 무료에선 위 링크로 확인.")
 
+        # ⏱ Gixen 스나이핑 등록 도우미: eBay 번호 + 권장입찰가(배송 반영)를 복사해 Gixen에 붙여넣기
+        st.divider()
+        _num = links.ebay_item_number(r.get("url"), r.get("item_id"))
+        st.markdown(
+            f"⏱ **Gixen 스나이핑 등록** — [Gixen 모바일 열기]({links.gixen_url()}) 후 "
+            f"아래 두 값을 붙여넣으세요 (각 칸 우측 복사 아이콘):"
+        )
+        _g1, _g2 = st.columns(2)
+        with _g1:
+            st.caption("① eBay 아이템 번호")
+            st.code(_num or "추출 실패", language=None)
+        with _g2:
+            st.caption("② 최대 입찰가 ($, 배송비 이미 반영)")
+            st.code(f"{r['max_bid']:.2f}" if pd.notna(r.get("max_bid")) else "-", language=None)
+        st.caption("Gixen이 종료 직전 이 금액까지만 자동 입찰 → 넘으면 입찰 안 함(과입찰/손해 방지).")
+
 # ============== 탭 2: 인기·거래량 ==============
 with tab2:
     st.caption("**거래량(표본)이 많은 = 인기·환금성 높은 카드** 순. 사고팔기 쉬운 카드 위주로 보세요.")

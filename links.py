@@ -43,6 +43,19 @@ def pricecharting_url(query):
     return f"https://www.pricecharting.com/search-products?q={q}&type=prices"
 
 
+def gixen_url():
+    return config.GIXEN_URL
+
+
+def ebay_item_number(url, item_id=""):
+    """Gixen 등록에 쓰는 eBay 숫자 아이템 번호 추출."""
+    m = re.search(r"/itm/(?:[^/]*/)?(\d{9,15})", url or "")
+    if m:
+        return m.group(1)
+    m = re.search(r"\|(\d{9,15})\|", item_id or "") or re.search(r"(\d{9,15})", item_id or "")
+    return m.group(1) if m else None
+
+
 def psa_apr_url():
     return "https://www.psacard.com/auctionprices"
 

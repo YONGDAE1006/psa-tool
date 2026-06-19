@@ -64,13 +64,7 @@ def _fmt_left(secs):
 
 def ebay_item_number(r):
     """Gixen 등록에 쓰는 eBay 숫자 아이템 번호 추출."""
-    url = r.get("url") or ""
-    m = re.search(r"/itm/(?:[^/]*/)?(\d{9,15})", url)
-    if m:
-        return m.group(1)
-    iid = r.get("item_id") or ""
-    m = re.search(r"\|(\d{9,15})\|", iid) or re.search(r"(\d{9,15})", iid)
-    return m.group(1) if m else None
+    return links.ebay_item_number(r.get("url"), r.get("item_id"))
 
 
 def _query(r):
@@ -105,7 +99,7 @@ def build_buttons(r):
     rows = []
     if r.get("url"):
         rows.append([("🟢 eBay 앱에서 입찰", r["url"])])
-    rows.append([("⏱ Gixen 등록", "https://m.gixen.com"),
+    rows.append([("⏱ Gixen 등록", links.gixen_url()),
                  ("💰 최근 낙찰가", links.ebay_sold_url(q))])
     rows.append([("📊 시세·그래프(PriceCharting)", links.pricecharting_url(q))])
     return rows

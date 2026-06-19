@@ -25,6 +25,8 @@ EBAY_MARKETPLACE = os.getenv("EBAY_MARKETPLACE", "EBAY_US")
 # 수취지 미국 ZIP. eBay 계산식 배송비를 이 목적지 기준으로 정확히 받기 위함.
 # (없으면 일부 매물 배송비가 비어 DEFAULT_SHIPPING으로 떨어짐). PSA창고/본인 미국주소 ZIP.
 EBAY_SHIP_ZIP = os.getenv("EBAY_SHIP_ZIP", "19720")
+# Gixen 스나이핑 사이트 (m.gixen.com 은 폐쇄됨 → 모바일은 /mobile/).
+GIXEN_URL = os.getenv("GIXEN_URL", "https://www.gixen.com/mobile/")
 SEARCH_QUERY = os.getenv("SEARCH_QUERY", "pokemon psa10")  # 붙여써야 PSA10만 정확히 잡힘
 SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "100"))  # 한 번에 가져올 매물 수
 
