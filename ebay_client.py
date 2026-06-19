@@ -102,6 +102,7 @@ def _normalize_live_item(it):
         if cost and cost.get("value") is not None:
             shipping = float(cost["value"])
             break
+    seller = it.get("seller") or {}
     return {
         "item_id": it.get("itemId", ""),
         "title": it.get("title", ""),
@@ -113,6 +114,9 @@ def _normalize_live_item(it):
         "bid_count": int(it.get("bidCount", 0) or 0),
         "shipping": shipping,
         "item_country": (it.get("itemLocation") or {}).get("country", ""),
+        "seller_name": seller.get("username", ""),
+        "seller_feedback": int(seller.get("feedbackScore") or 0),
+        "seller_pct": float(seller.get("feedbackPercentage") or 0),
     }
 
 
@@ -154,6 +158,7 @@ def _fetch_demo():
             "bid_count": bids,
             "shipping": float(shipping),
             "item_country": country,
+            "seller_name": "demo_seller", "seller_feedback": 250, "seller_pct": 99.5,
         })
     out.sort(key=lambda x: x["end_time"])
     return out
@@ -209,6 +214,7 @@ def _fetch_serpapi():
             "bid_count": int(bids.get("count") or 0),
             "shipping": float(ship),
             "item_country": country,
+            "seller_name": "", "seller_feedback": 0, "seller_pct": 0.0,
         })
     return out
 

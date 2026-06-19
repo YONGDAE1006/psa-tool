@@ -141,6 +141,16 @@ df["Gixen"] = df.apply(
     axis=1,
 )
 
+# 셀러(이름·리뷰수). 저평판이면 ⚠️ — 신규셀러의 싼 PSA10 = 사기(가짜슬랩/미발송) 위험.
+def _seller_str(r):
+    name = r.get("seller_name") or ""
+    fb = int(r.get("seller_feedback") or 0)
+    if not name:
+        return "-"
+    return f"{name} ({fb})" + (" ⚠️" if fb < config.SELLER_FLAG_FEEDBACK else "")
+
+df["셀러"] = df.apply(_seller_str, axis=1)
+
 
 def _fresh(updated):
     if not updated:
@@ -203,7 +213,7 @@ with tab1:
         view = view[view["후보"]]
 
     show = view[[
-        "신호", "Gixen", "남은시간", "title", "current_bid", "max_bid",
+        "신호", "Gixen", "남은시간", "title", "셀러", "current_bid", "max_bid",
         "ROI%", "profit", "추세", "market_value", "all_time_value", "sold_n",
         "matched_name", "bid_count", "shipping", "url", "sold_url",
     ]].rename(columns={
@@ -219,6 +229,8 @@ with tab1:
         on_select="rerun", selection_mode="single-row",
         column_config={
             "신호": st.column_config.TextColumn("신호", help="🟢후보 / 🔥스틸"),
+            "셀러": st.column_config.TextColumn(
+                "셀러", help="셀러ID (리뷰수). ⚠️=리뷰 적음 → 신규/저평판 셀러 사기 주의"),
             "Gixen": st.column_config.LinkColumn(
                 "Gixen", display_text="⏱등록",
                 help="클릭→Gixen에 eBay번호·권장입찰가 자동입력. Add는 검토 후 직접 누르세요."),
@@ -263,6 +275,9 @@ with tab1:
         st.markdown(f"### {r['title']}")
         if r.get("matched_name"):
             st.caption(f"🔗 시세 기준 카드: **{r['matched_name']}** (eBay 제목과 다르면 매칭 오류일 수 있음)")
+        _sfb = int(r.get("seller_feedback") or 0)
+        _swarn = " ⚠️ **신규/저평판 셀러 — 사기 주의**(가짜 슬랩·미발송 위험)" if _sfb < config.SELLER_FLAG_FEEDBACK else ""
+        st.caption(f"👤 셀러 **{r.get('seller_name') or '-'}** · 리뷰 {_sfb}건 · {r.get('seller_pct') or 0:.0f}% 긍정{_swarn}")
         a, b, c, d = st.columns(4)
         a.metric("현재시세", _m(r["market_value"]))
         b.metric("역대중앙값", _m(r["all_time_value"]))

@@ -43,6 +43,9 @@ def init_db():
                 is_steal     INTEGER,
                 shipping     REAL,
                 item_country TEXT,
+                seller_name  TEXT,
+                seller_feedback INTEGER,
+                seller_pct   REAL,
                 pc_id        TEXT,
                 pc_name      TEXT,
                 pc_console   TEXT,
@@ -92,6 +95,13 @@ def init_db():
             conn.execute("ALTER TABLE sold_cache ADD COLUMN num_confirmed INTEGER")
         except sqlite3.OperationalError:
             pass
+        # 마이그레이션: 구버전 listings 에 셀러 컬럼 추가
+        for col, typ in (("seller_name", "TEXT"), ("seller_feedback", "INTEGER"),
+                         ("seller_pct", "REAL")):
+            try:
+                conn.execute(f"ALTER TABLE listings ADD COLUMN {col} {typ}")
+            except sqlite3.OperationalError:
+                pass
 
 
 def get_sold_cache(query, max_age_hours):

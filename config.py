@@ -39,6 +39,10 @@ MAX_SHIPPING = float(os.getenv("MAX_SHIPPING", "10"))
 CURRENCY = os.getenv("CURRENCY", "USD").strip().upper()
 # 최소 입찰 수. 이 값 미만이면 제외. (11 = '입찰 10건 초과'만 = 수요 있는 매물)
 MIN_BID_COUNT = int(os.getenv("MIN_BID_COUNT", "11"))
+# 셀러 리뷰(피드백) 수 하한. 이 미만 셀러 매물은 제외(0=필터 끔, 전부 표시).
+# 신규/저평판 셀러의 싼 PSA10 = 사기(가짜슬랩/미발송) 위험. 대시보드엔 ⚠️로도 표시.
+MIN_SELLER_FEEDBACK = int(os.getenv("MIN_SELLER_FEEDBACK", "0"))
+SELLER_FLAG_FEEDBACK = int(os.getenv("SELLER_FLAG_FEEDBACK", "30"))  # 이 미만이면 ⚠️ 주의 표시
 # 입찰이 적어도 ROI가 이 값 이상이면 예외적으로 표시(🔥스틸). 0.5 = 50%.
 # 단, 크레딧 절약을 위해 '이미 캐시에 시세가 있는 카드'만 대상.
 HIGH_ROI_OVERRIDE = float(os.getenv("HIGH_ROI_OVERRIDE", "0.5"))

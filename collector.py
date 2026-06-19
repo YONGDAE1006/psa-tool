@@ -34,7 +34,8 @@ def run():
     out = []
     alert_rows = []   # 목록엔 안 넣지만 너무 좋아서 알림만 보낼 위험(하락) 매물
     skipped = {"country": 0, "shipping": 0, "currency": 0, "foreign": 0, "budget": 0,
-               "keyword": 0, "lowvalue": 0, "lowprofit": 0, "bids": 0, "risky": 0}
+               "keyword": 0, "lowvalue": 0, "lowprofit": 0, "bids": 0, "risky": 0,
+               "seller": 0}
     for it in listings:
         title = it["title"]
         # PSA 10 매물만 (제목에 PSA 10 표기가 있는 것)
@@ -61,6 +62,9 @@ def run():
             continue
         if any(kw in low for kw in config.EXCLUDE_KEYWORDS):
             skipped["keyword"] += 1
+            continue
+        if config.MIN_SELLER_FEEDBACK > 0 and (it.get("seller_feedback") or 0) < config.MIN_SELLER_FEEDBACK:
+            skipped["seller"] += 1
             continue
 
         meets_bids = (it.get("bid_count") or 0) >= config.MIN_BID_COUNT
@@ -150,6 +154,9 @@ def run():
             "is_steal": 1 if is_steal else 0,
             "shipping": it["shipping"],
             "item_country": it.get("item_country", ""),
+            "seller_name": it.get("seller_name", ""),
+            "seller_feedback": it.get("seller_feedback", 0),
+            "seller_pct": it.get("seller_pct", 0.0),
             "pc_id": pc["pc_id"] if pc else None,
             "pc_name": pc["product_name"] if pc else None,
             "pc_console": pc["console_name"] if pc else None,
@@ -201,6 +208,7 @@ def run():
           f"profit<{config.MIN_PROFIT:.0f}: {skipped['lowprofit']}, "
           f"foreign(영어판아님): {skipped['foreign']}, "
           f"bids<{config.MIN_BID_COUNT}: {skipped['bids']}, keyword: {skipped['keyword']}, "
+          f"seller<{config.MIN_SELLER_FEEDBACK}: {skipped['seller']}, "
           f"risky(hidden): {skipped['risky']}, risky-alerts: {len(alert_rows)}")
     return len(out)
 
