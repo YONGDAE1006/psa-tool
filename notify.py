@@ -95,11 +95,12 @@ def format_candidate(r, risky=False):
 
 def build_buttons(r):
     """폰에서 바로 행동할 수 있는 탭 버튼."""
-    q = _query(r)
+    # 검증 검색어 = 시세 가져온 카드명(원제목은 노이즈 많아 PriceCharting서 0건)
+    vq = links.verify_query(r.get("matched_name"), r.get("title"))
     rows = []
     if r.get("url"):
         rows.append([("🟢 eBay 앱에서 입찰", r["url"])])
     rows.append([("⏱ Gixen 등록", links.gixen_url()),
-                 ("💰 최근 낙찰가", links.ebay_sold_url(q))])
-    rows.append([("📊 시세·그래프(PriceCharting)", links.pricecharting_url(q))])
+                 ("💰 최근 낙찰가", links.ebay_sold_url(vq + " PSA 10"))])
+    rows.append([("📊 시세·그래프(PriceCharting)", links.pricecharting_url(vq))])
     return rows

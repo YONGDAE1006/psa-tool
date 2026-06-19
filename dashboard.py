@@ -266,8 +266,10 @@ with tab1:
             if r.get("url"):
                 c1.link_button("🟢 eBay", r["url"], use_container_width=True)
             c2.link_button("⏱ Gixen", links.gixen_url(), use_container_width=True)
-            c3.link_button("📊 시세검증", links.pricecharting_url(r.get("검색어") or r["title"]),
-                           use_container_width=True)
+            c3.link_button(
+                "📊 시세검증",
+                links.pricecharting_url(links.verify_query(r.get("matched_name"), r.get("title"))),
+                use_container_width=True)
             _mb = c4.number_input(
                 "내 최대입찰가($)", min_value=0.0, step=1.0,
                 value=float(round(r["max_bid"], 2)) if pd.notna(r.get("max_bid")) else 0.0,

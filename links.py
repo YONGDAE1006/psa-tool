@@ -26,6 +26,26 @@ def build_query(pc_console, pc_name, title, match_score):
     return base
 
 
+def verify_query(matched_name, title=""):
+    """시세 검증(PriceCharting/eBay) 검색어. 시세 가져온 카드명(matched_name)을 깔끔히 변환.
+    원제목엔 SHINY/GEM MINT/연도 등 노이즈가 많아 PriceCharting서 0건 → 카드명으로 검색."""
+    base = ""
+    if matched_name:
+        parts = matched_name.split("·")
+        left = parts[0].replace("-", " ")
+        # 세트명 앞 코드(SV:/ME:/SWSH09: 등) 제거. 'Hidden Fates:'처럼 실제 세트명은 유지.
+        setname = re.sub(r"^[A-Za-z0-9]+\s*:\s*", "", parts[1].strip()) if len(parts) > 1 else ""
+        seen, toks = set(), []
+        for t in left.split():            # 중복 번호 토큰 제거(183/165 183/165 → 183/165)
+            if t.lower() not in seen:
+                seen.add(t.lower())
+                toks.append(t)
+        base = (" ".join(toks) + " " + setname).strip()
+    if not base:
+        base = title or ""
+    return re.sub(r"\s+", " ", base).strip()
+
+
 def ebay_sold_url(query):
     q = urllib.parse.quote_plus(query)
     # LH_Sold=1, LH_Complete=1 = 낙찰/완료된 매물, _sop=13 = 최근 종료순
