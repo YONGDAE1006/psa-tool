@@ -19,6 +19,11 @@ def _upscale_img(url):
     """eBay 썸네일 해상도 ↑ (s-l225 → s-l500). 깨짐 방지."""
     return re.sub(r"s-l\d+", "s-l500", url) if url else url
 
+
+def _toggle_gixen(item_id):
+    """Gixen 등록 체크 토글 → DB 저장(영구 유지)."""
+    db.set_gixen_mark(item_id, bool(st.session_state.get(f"gx_{item_id}", False)))
+
 st.set_page_config(page_title="Pokemon PSA10 비딩 대시보드", layout="wide")
 
 
@@ -220,6 +225,10 @@ with tab1:
     # 입찰 여지가 있는 것만: 현재가 < 권장최대입찰가. 이미 비싼(현재가≥권장) 매물은 제외.
     view = view[view["max_bid"].notna() & (view["current_bid"] < view["max_bid"])]
 
+    _gx_marks = db.get_gixen_marks()   # Gixen 등록 체크(영구 저장)
+    if _gx_marks and st.checkbox(f"☑️ Gixen 등록한 {len(_gx_marks)}건 숨기기 (남은 것만 보기)"):
+        view = view[~view["item_id"].isin(_gx_marks)]
+
     _sortby = st.radio("정렬", ["종료임박순", "ROI순", "예상수익순"],
                        horizontal=True, label_visibility="collapsed")
     if _sortby == "ROI순":
@@ -252,7 +261,8 @@ with tab1:
                              use_container_width=True)
             with top[2]:
                 hc = st.columns([8, 2])
-                hc[0].markdown(f"#### {ic} {r['title']}")
+                _done = "✅ " if r["item_id"] in _gx_marks else ""
+                hc[0].markdown(f"#### {ic} {_done}{r['title']}")
                 hc[1].markdown(
                     f"<div style='text-align:right;padding-top:10px;color:#888'>⏳ <b>{r['남은시간']}</b></div>",
                     unsafe_allow_html=True)
@@ -294,6 +304,9 @@ with tab1:
             st.markdown(
                 f"📋 Gixen 붙여넣기 → eBay번호 `{_num or '?'}` · 최대입찰 `${_mb:.2f}` "
                 "— 위 칸에서 직접 조절(얇은 카드는 시세검증 보고)")
+            st.checkbox("✅ Gixen 등록 완료 (체크는 새로고침해도 유지됨)",
+                        value=(r["item_id"] in _gx_marks), key=f"gx_{r['item_id']}",
+                        on_change=_toggle_gixen, args=(r["item_id"],))
 
     st.markdown(
         f"🔎 추가 검증 도구: [130point]({links.point130_url()}) · "

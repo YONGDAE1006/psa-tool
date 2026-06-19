@@ -258,3 +258,25 @@ def delete_trade(trade_id):
     with get_conn() as conn:
         _ensure_trades(conn)
         conn.execute("DELETE FROM trades WHERE id = ?", (trade_id,))
+
+
+# ---------- Gixen 등록 체크(새로고침/재시작에도 유지) ----------
+def _ensure_gixen(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS gixen_marks (item_id TEXT PRIMARY KEY, at TEXT)")
+
+
+def get_gixen_marks():
+    with get_conn() as conn:
+        _ensure_gixen(conn)
+        return {row["item_id"] for row in conn.execute("SELECT item_id FROM gixen_marks")}
+
+
+def set_gixen_mark(item_id, on=True):
+    import datetime as _dt
+    with get_conn() as conn:
+        _ensure_gixen(conn)
+        if on:
+            conn.execute("INSERT OR REPLACE INTO gixen_marks (item_id, at) VALUES (?, ?)",
+                         (item_id, _dt.datetime.now(_dt.timezone.utc).isoformat()))
+        else:
+            conn.execute("DELETE FROM gixen_marks WHERE item_id = ?", (item_id,))
