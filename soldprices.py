@@ -287,13 +287,14 @@ def _ppt_resolve_id(name, card_number, base):
         r = _ppt_get(f"{base}/cards", {"search": q, "limit": limit})
         return ((r.json() or {}).get("data") or []) if r is not None else []
 
-    # 1차: 이름만으로 검색(recall 좋음. 번호를 붙이면 PPT가 0건 주는 카드 多) → 번호로 확정
-    best, matched = pick(fetch(name, 25))
+    # 1차: 이름만으로 검색(recall 좋음. 번호를 붙이면 PPT가 0건 주는 카드 多) → 번호로 확정.
+    # limit=10(=10크레딧). 흔한 이름이라 정답이 top10 밖이면 아래 2차 폴백이 받쳐줌.
+    best, matched = pick(fetch(name, 10))
 
     # 2차 폴백: 번호가 있는데 1차에서 번호일치 못 찾음(이름이 흔해 limit 밖이거나 1차 0건)
-    #          → '이름 번호'로 좁혀 재검색
+    #          → '이름 번호'로 좁혀 재검색(번호검색은 결과 적어 limit=5로 충분).
     if qn and not matched:
-        b2, m2 = pick(fetch(f"{name} {card_number}".strip(), 8))
+        b2, m2 = pick(fetch(f"{name} {card_number}".strip(), 5))
         if m2:
             best, matched = b2, True
 
