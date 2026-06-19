@@ -46,7 +46,11 @@ ENGLISH_ONLY = os.getenv("ENGLISH_ONLY", "true").lower() == "true"
 FOREIGN_MARKERS = [
     w.strip().lower() for w in os.getenv(
         "FOREIGN_MARKERS",
-        "japanese,japan,jpn,jp ,korean,chinese,german,french,spanish,italian,portuguese,taiwan"
+        # 언어/지역 + 일본 전용 세트코드/명칭(영어판엔 안 쓰는 것만)
+        "japanese,japan,jpn,jp ,korean,chinese,german,french,spanish,italian,portuguese,taiwan,"
+        "sv2a,sv3a,sv4a,sv4k,sv5a,sv6a,sv7a,sv8a,sv9a,sv10a,"
+        "s4a,s6a,s8b,s12a,sm12a,"
+        "shiny star,shiny treasure,vmax climax,vstar universe,battle festa"
     ).split(",") if w.strip()
 ]
 # 제목에 이 단어가 있으면 제외 (묶음/커스텀/가짜 등). 쉼표로 구분.
