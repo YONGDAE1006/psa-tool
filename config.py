@@ -22,7 +22,7 @@ SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID", "")
 EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET", "")
 EBAY_MARKETPLACE = os.getenv("EBAY_MARKETPLACE", "EBAY_US")
-SEARCH_QUERY = os.getenv("SEARCH_QUERY", "pokemon psa 10")
+SEARCH_QUERY = os.getenv("SEARCH_QUERY", "pokemon psa10")  # 붙여써야 PSA10만 정확히 잡힘
 SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "100"))  # 한 번에 가져올 매물 수
 
 # ---------- 매물 필터 (거래 조건) ----------
