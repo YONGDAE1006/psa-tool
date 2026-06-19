@@ -94,6 +94,8 @@ if not rows:
 
 df = pd.DataFrame(rows)
 df["secs_left"] = df["end_time"].apply(time_left)
+# 이미 종료된 경매 제외(다음 수집 전까지 DB에 남아있어도 입찰 불가). 종료시각 불명(None)은 유지.
+df = df[df["secs_left"].isna() | (df["secs_left"] > 0)].reset_index(drop=True)
 df["남은시간"] = df["secs_left"].apply(fmt_left)
 df["ROI%"] = df["roi"].apply(lambda x: round(x * 100, 1) if x is not None else None)
 
@@ -181,7 +183,8 @@ c1, c2, c3, c4 = st.columns(4)
 c1.metric("표시 매물", len(df))
 c2.metric("비딩 후보", int(df["후보"].sum()))
 c3.metric("실낙찰가 확보", int((df["value_source"] == "sold").sum()))
-c4.metric("종료 임박(1시간 내)", int((df["secs_left"].fillna(9e9) <= 3600).sum()))
+c4.metric("종료 임박(1시간 내)",
+          int(((df["secs_left"] > 0) & (df["secs_left"] <= 3600)).sum()))
 
 if config.MODE == "demo":
     st.info("지금은 **DEMO 모드** (가짜 eBay 매물 + 샘플 시세). 전체 흐름 확인용입니다.")
