@@ -82,10 +82,12 @@ if st.sidebar.button("🔄 데이터 새로고침 (eBay 다시 수집)"):
 # ---------------- 본문 ----------------
 st.title("🃏 Pokemon PSA 10 — 종료임박 비딩 대시보드")
 _loc = config.ITEM_LOCATION_COUNTRY or "전체"
+_vp = (f"시세 **${config.MIN_MARKET_VALUE:.0f}+** · 예상수익 **${config.MIN_PROFIT:.0f}+** · "
+       if (config.MIN_MARKET_VALUE > 0 or config.MIN_PROFIT > 0)
+       else "시세·ROI **직접 판단**(필터 없음) · ")
 st.caption(f"적용 조건: 소재지 **{_loc}** · 배송비 **${config.MAX_SHIPPING:.0f} 미만** · "
-           f"현재가 **${config.MAX_BID:.0f} 이하** · 시세 **${config.MIN_MARKET_VALUE:.0f}+** · 예상수익 **${config.MIN_PROFIT:.0f}+** · "
-           f"입찰 **{config.MIN_BID_COUNT}건 이상**(ROI {config.HIGH_ROI_OVERRIDE:.0%}+ 는 🔥스틸 예외) · 경매(종료임박순) "
-           f"— 조건은 `.env`에서 조정")
+           f"현재가 **${config.MAX_BID:.0f} 이하** · {_vp}"
+           f"입찰 **{config.MIN_BID_COUNT}건 이상** · 영어판만 · 경매(종료임박순) — 조건은 `.env`에서 조정")
 
 rows = db.get_listings()
 if not rows:
@@ -182,19 +184,15 @@ def _fresh(updated):
     return f"{d}일 전" + (" ⚠️오래됨" if d > config.STALE_DAYS else "")
 
 
-# 요약 메트릭 — 아래 카드에 실제 표시되는 것(입찰 여지 있는 것 + Gixen 등록)과 일치.
-_marks_m = db.get_gixen_marks()
-_shown_mask = (
-    (df["max_bid"].notna() & (df["current_bid"] < df["max_bid"]))
-    | df["item_id"].isin(_marks_m)
-)
+# 요약 메트릭
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("표시 후보", int(_shown_mask.sum()),
-          help="아래 카드에 보이는 입찰 가능 후보. 현재가≥권장입찰('이미 비싼')은 제외돼 수집매물보다 적을 수 있음")
-c2.metric("비딩 후보(신뢰)", int(df["후보"].sum()))
+c1.metric("활성 매물", len(df),
+          help=f"입찰 {config.MIN_BID_COUNT}건 이상 + 배송/예산/영어 통과. 시세·ROI는 직접 판단")
+c2.metric("🟢 신뢰 후보", int(df["후보"].sum()),
+          help="시세 신뢰(표본 충분)+ROI 좋은 것 = 도구가 추천(참고용)")
 c3.metric("실낙찰가 확보", int((df["value_source"] == "sold").sum()))
 c4.metric("종료 임박(1h)",
-          int((_shown_mask & (df["secs_left"] > 0) & (df["secs_left"] <= 3600)).sum()))
+          int(((df["secs_left"] > 0) & (df["secs_left"] <= 3600)).sum()))
 
 if config.MODE == "demo":
     st.info("지금은 **DEMO 모드** (가짜 eBay 매물 + 샘플 시세). 전체 흐름 확인용입니다.")
@@ -236,11 +234,7 @@ with tab1:
     if only_good:
         view = view[view["후보"]]
     _gx_marks = db.get_gixen_marks()   # Gixen 등록 체크(영구 저장)
-    # 입찰 여지 있는 것(현재가<권장) + Gixen 등록한 것(추적용)은 항상 표시.
-    view = view[
-        (view["max_bid"].notna() & (view["current_bid"] < view["max_bid"]))
-        | view["item_id"].isin(_gx_marks)
-    ]
+    # (입찰여지 필터 제거 — 시세/ROI는 사용자가 직접 판단. 입찰 N건 이상 활성 매물 모두 표시)
     if _gx_marks and st.checkbox(f"☑️ Gixen 등록한 {len(_gx_marks)}건 숨기기 (남은 것만 보기)"):
         view = view[~view["item_id"].isin(_gx_marks)]
 
