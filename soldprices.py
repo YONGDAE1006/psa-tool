@@ -62,6 +62,7 @@ _PPT_NOISE = re.compile(
 
 _PPT_ABBR = {
     "mltrs": "moltres", "zpds": "zapdos", "artcn": "articuno",  # Hidden Fates 태그팀 약어
+    "vm": "vmax",   # 셀러가 VMAX를 'VM'으로 줄여쓰는 경우
 }
 
 
@@ -104,7 +105,7 @@ def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=Fa
 
     cached = db.get_sold_cache(key, config.SOLD_CACHE_HOURS)
     if cached is not None:
-        return cached if cached["n"] else None
+        return cached if (cached["n"] or cached.get("card_image")) else None
 
     # 입찰 적은 매물 등은 캐시에 없으면 크레딧을 쓰지 않고 포기
     if cache_only:
@@ -277,7 +278,17 @@ def _ppt(name, card_number, tcgplayer_id, title=""):
     smart = psa10.get("smartMarketPrice") or {}
     # 현재 시세 = 스마트시세(최근 가중) 우선, 없으면 최근7일 중앙값, 그것도 없으면 역대 중앙값
     current = smart.get("price") or psa10.get("marketPriceMedian7Day") or psa10.get("medianPrice")
+    # 공식 이미지·매칭명은 PSA10 가격과 무관 — 카드가 매칭됐으면 항상 확보.
+    _img = d.get("imageCdnUrl400") or d.get("imageCdnUrl")
+    _nm = " ".join(str(x) for x in [d.get("name"), d.get("cardNumber")] if x).strip()
+    if d.get("setName"):
+        _nm = f"{_nm} · {d.get('setName')}"
     if not n or current is None:
+        # 가격은 없어도 이미지·매칭명만이라도 살려서 반환(가격은 None)
+        if _img or _nm:
+            return {"median": None, "avg": None, "n": 0, "all_time": None,
+                    "source": "pokemonpricetracker", "matched_name": _nm or None,
+                    "num_confirmed": num_confirmed, "card_image": _img}
         return None
     current = float(current)
     # (이전의 priceHistory '최근가 보정'은 얇은 카드에서 단일 outlier를 잡아 과대평가하는
