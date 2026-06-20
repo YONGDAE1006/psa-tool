@@ -408,10 +408,6 @@ with tab4:
     bids = db.get_bids()
     if bids:
         bdf = pd.DataFrame(bids)
-        bdf["놓친이득"] = bdf.apply(
-            lambda r: round(r["market_value"] - r["final_price"], 2)
-            if (r["result"] == "패찰" and pd.notna(r["market_value"]) and pd.notna(r["final_price"]))
-            else None, axis=1)
         bdf["차이"] = bdf.apply(
             lambda r: round((r["final_price"] or 0) - (r["my_bid"] or 0), 2)
             if pd.notna(r["final_price"]) else None, axis=1)
@@ -419,18 +415,20 @@ with tab4:
         m1.metric("총 입찰", len(bdf))
         won = int((bdf["result"] == "낙찰").sum())
         m2.metric("낙찰률", f"{won/len(bdf)*100:.0f}%" if len(bdf) else "0%")
-        m3.metric("패찰로 놓친 이득(합)",
-                  f"${bdf['놓친이득'].dropna().clip(lower=0).sum():,.0f}",
-                  help="시세보다 싸게 낙찰된 걸 패찰한 경우 = 조금만 더 썼으면 먹었을 이득")
+        lost = bdf[bdf["result"] == "패찰"]
+        avoided = int((lost["net_if_won"] < 0).sum()) if len(lost) else 0
+        m3.metric("잘 진 패찰", f"{avoided}건",
+                  help="패찰인데 이겼다면 NET 손해였을 것 = 안 사길 잘함")
         st.dataframe(
             bdf[["id", "created_at", "card", "my_bid", "final_price", "차이",
-                 "market_value", "놓친이득", "result"]].rename(columns={
+                 "market_value", "net_if_won", "result"]].rename(columns={
                      "created_at": "날짜", "card": "카드", "my_bid": "내입찰",
-                     "final_price": "최종가", "market_value": "시세", "result": "결과"}),
+                     "final_price": "최종가", "market_value": "시세",
+                     "net_if_won": "이겼다면NET수익", "result": "결과"}),
             use_container_width=True, hide_index=True,
         )
-        st.caption("**차이** = 최종가 − 내입찰(얼마 차로 졌나) · **놓친이득** = 시세 − 최종가"
-                   "(패찰인데 시세보다 싸게 팔림 = 조금만 더 썼으면 먹었을 이득)")
+        st.caption("**차이** = 최종가 − 내입찰(얼마 차로 졌나) · **이겼다면NET수익** = 그 가격에 "
+                   "낙찰했다면 되팔아 남는 실수익(수수료 13%+$3·배송 반영). **음수 = 이겼으면 손해**(잘 진 것)")
         did = st.number_input("삭제할 입찰 id", min_value=0, step=1, value=0, key="del_bid")
         if st.button("입찰 기록 삭제") and did:
             db.delete_bid(int(did))

@@ -266,21 +266,42 @@ def _ensure_bidlog(conn):
         """CREATE TABLE IF NOT EXISTS bid_log (
                id INTEGER PRIMARY KEY AUTOINCREMENT,
                created_at TEXT, item_id TEXT, card TEXT,
-               my_bid REAL, final_price REAL, market_value REAL,
-               result TEXT, note TEXT)"""
+               my_bid REAL, final_price REAL, market_value REAL, shipping REAL,
+               net_if_won REAL, result TEXT, note TEXT)"""
     )
+    for col, typ in (("shipping", "REAL"), ("net_if_won", "REAL")):
+        try:
+            conn.execute(f"ALTER TABLE bid_log ADD COLUMN {col} {typ}")
+        except sqlite3.OperationalError:
+            pass
 
 
-def add_bid(card, my_bid, final_price, market_value, result, item_id="", note="", when=None):
+def _net_if_won(market_value, final_price, shipping):
+    """이 가격에 낙찰했다면 되팔아 남는 실제 수익(수수료+배송 반영). 음수=손해."""
+    if market_value is None or final_price is None:
+        return None
+    fee, flat = (0.13, 3.0) if market_value < 100 else \
+        (0.13, 0.0) if market_value < 500 else \
+        (0.12, 0.0) if market_value < 1000 else \
+        (0.10, 0.0) if market_value < 2500 else \
+        (0.09, 0.0) if market_value < 5000 else (0.07, 0.0)
+    net_resale = market_value * (1 - fee) - flat
+    return round(net_resale - (final_price + (shipping or 0)), 2)
+
+
+def add_bid(card, my_bid, final_price, market_value, result,
+            item_id="", note="", shipping=0.0, when=None):
     import datetime as _dt
+    net = _net_if_won(market_value, final_price, shipping)
     with get_conn() as conn:
         _ensure_bidlog(conn)
         conn.execute(
             """INSERT INTO bid_log
-               (created_at, item_id, card, my_bid, final_price, market_value, result, note)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (created_at, item_id, card, my_bid, final_price, market_value,
+                shipping, net_if_won, result, note)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (when or _dt.datetime.now().strftime("%Y-%m-%d"), item_id, card,
-             my_bid, final_price, market_value, result, note),
+             my_bid, final_price, market_value, shipping, net, result, note),
         )
 
 
