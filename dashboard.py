@@ -22,6 +22,20 @@ def _upscale_img(url):
     return re.sub(r"s-l\d+", "s-l500", url) if url else url
 
 
+def _card_img_html(url, cap):
+    """실물·공식 이미지를 인라인 스타일로 직접 렌더 → Streamlit DOM 변화와 무관하게
+    두 이미지가 항상 동일한 박스 크기로 통일됨. (CSS testid 선택자 의존 제거.)
+    카드 비율(5:7)에 맞춘 고정박스 + object-fit:cover로 둘 다 꽉 채워 크기 일치."""
+    return (
+        "<div style='text-align:center'>"
+        f"<img src='{url}' style='width:100%;aspect-ratio:5/7;object-fit:cover;"
+        "object-position:center;display:block;border-radius:12px;"
+        "border:1px solid rgba(255,255,255,.10);background:#0c0e13'/>"
+        f"<div style='color:#9aa3b2;font-size:.78rem;margin-top:4px'>{cap}</div>"
+        "</div>"
+    )
+
+
 def _toggle_gixen(item_id):
     """Gixen 등록 체크 토글 → DB 저장(영구 유지)."""
     db.set_gixen_mark(item_id, bool(st.session_state.get(f"gx_{item_id}", False)))
@@ -88,8 +102,7 @@ h4 { font-weight:600 !important; color:#f4f5f7 !important; }
 
 /* ===== 이미지/입력/탭/사이드바 ===== */
 [data-testid="stImage"] img{ border-radius:12px; border:1px solid rgba(255,255,255,.07); }
-[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stImage"] img{
-  height:155px !important; object-fit:contain; background:#0c0e13; width:100%; }
+/* 실물·공식 카드 이미지는 _card_img_html 인라인 스타일로 크기 통일(아래 CSS 미사용). */
 input, textarea, [data-baseweb="input"]{ background:#1a1d25 !important; color:#f4f5f7 !important; }
 [data-testid="stTabs"] [data-baseweb="tab"]{ font-weight:600; font-size:.98rem; color:#9ca3af; }
 [data-testid="stTabs"] [aria-selected="true"]{ color:#fbbf24 !important; }
@@ -342,12 +355,14 @@ with tab1:
     for _, r in view.iterrows():
         ic, lbl = _BADGE.get(r["신호"], ("•", "관망"))
         with st.container(border=True):
-            top = st.columns([1, 1, 5])
+            top = st.columns([1.3, 1.3, 5])
             _eimg, _cimg = r.get("image"), r.get("card_image")
             if pd.notna(_eimg) and _eimg:
-                top[0].image(_upscale_img(_eimg), caption="실물", use_container_width=True)
+                top[0].markdown(_card_img_html(_upscale_img(_eimg), "실물"),
+                                unsafe_allow_html=True)
             if pd.notna(_cimg) and _cimg:
-                top[1].image(_cimg, caption="공식", use_container_width=True)
+                top[1].markdown(_card_img_html(_cimg, "공식"),
+                                unsafe_allow_html=True)
             with top[2]:
                 hc = st.columns([8, 2])
                 _done = "✅ " if r["item_id"] in _gx_marks else ""
