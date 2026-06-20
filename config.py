@@ -120,6 +120,8 @@ PPT_BASE_URL = os.getenv("PPT_BASE_URL", "https://www.pokemonpricetracker.com/ap
 # 판매 방식: psa_vault = PSA Vault에서 eBay 위탁판매(계단식 수수료, eBay 수수료 없음)
 #            ebay     = 일반 eBay 판매(고정 비율)
 SELL_MODE = os.getenv("SELL_MODE", "psa_vault").strip().lower()
+# PSA Offer 모드: 수수료 0, 단 오퍼가 시장가의 약 X%로 들어옴(실측 ~95%, 보수적 기본 0.92).
+PSA_OFFER_FACTOR = float(os.getenv("PSA_OFFER_FACTOR", "0.92"))
 # 일반 eBay 판매 시 수수료 비율(결제처리 포함). 기본 13.25%.
 RESELL_FEE_RATE = float(os.getenv("RESELL_FEE_RATE", "0.1325"))
 # 되팔 때 주문당 고정 수수료(USD). PSA Vault ≈ $3, 일반 eBay ≈ $0.40.

@@ -40,9 +40,14 @@ def evaluate(current_bid, shipping, psa10_price):
                 "breakeven_bid": None, "max_bid": None}
     ship = shipping or 0
     cost = (current_bid or 0) + ship
-    # 되팔 때 실수령 = 시세 - 판매수수료(계단식) - 고정비 - (내가 부담하는 발송비)
-    fee_rate, flat_fee = sell_fees(psa10_price)
-    net_resale = psa10_price * (1 - fee_rate) - flat_fee - config.RESALE_SHIP_COST
+    # 되팔 때 실수령:
+    #  - PSA Offer 모드: 수수료 0. 단 오퍼가 시장가의 ~95%로 들어와서 factor 적용(실측 3건 평균).
+    #  - 그 외(eBay/PSA Vault): 계단식 판매수수료 + 고정비 차감.
+    if config.SELL_MODE == "psa_offer":
+        net_resale = psa10_price * getattr(config, "PSA_OFFER_FACTOR", 0.92) - config.RESALE_SHIP_COST
+    else:
+        fee_rate, flat_fee = sell_fees(psa10_price)
+        net_resale = psa10_price * (1 - fee_rate) - flat_fee - config.RESALE_SHIP_COST
     profit = net_resale - cost
     roi = profit / cost if cost > 0 else None
 
