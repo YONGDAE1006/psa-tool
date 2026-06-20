@@ -30,7 +30,7 @@ def verify_query(matched_name, title=""):
     """시세 검증(PriceCharting/eBay) 검색어 = '카드명 + 카드번호 첫부분'만.
     세트명/총번호(/SV94)/연도/SHINY 등은 빼야 PriceCharting서 정확히 나옴.
     예: matched_name 'Buzzwole GX SV68/SV94 · Hidden Fates: Shiny Vault' → 'Buzzwole GX SV68'."""
-    if matched_name:
+    if isinstance(matched_name, str) and matched_name.strip():
         left = matched_name.split("·")[0].replace("-", " ")
         left = re.sub(r"\([^)]*\)", " ", left)       # '(Secret)' 등 괄호 내용 제거
         name_toks, num = [], None
@@ -44,7 +44,7 @@ def verify_query(matched_name, title=""):
         if name_toks:
             base = " ".join(name_toks) + (f" #{num}" if num else "")   # 'Pikachu #160' 형식
             return re.sub(r"\s+", " ", base).strip()
-    return re.sub(r"\s+", " ", (title or "")).strip()
+    return re.sub(r"\s+", " ", (title if isinstance(title, str) else "")).strip()
 
 
 def ebay_sold_url(query):
@@ -86,10 +86,12 @@ def gixen_snipe_url(item_number, max_bid=None):
 
 def ebay_item_number(url, item_id=""):
     """Gixen 등록에 쓰는 eBay 숫자 아이템 번호 추출."""
-    m = re.search(r"/itm/(?:[^/]*/)?(\d{9,15})", url or "")
+    url = url if isinstance(url, str) else ""
+    item_id = item_id if isinstance(item_id, str) else ""
+    m = re.search(r"/itm/(?:[^/]*/)?(\d{9,15})", url)
     if m:
         return m.group(1)
-    m = re.search(r"\|(\d{9,15})\|", item_id or "") or re.search(r"(\d{9,15})", item_id or "")
+    m = re.search(r"\|(\d{9,15})\|", item_id) or re.search(r"(\d{9,15})", item_id)
     return m.group(1) if m else None
 
 

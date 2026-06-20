@@ -262,11 +262,12 @@ with tab1:
         ic, lbl = _BADGE.get(r["신호"], ("•", "관망"))
         with st.container(border=True):
             top = st.columns([1, 1, 5])
-            if r.get("image"):
-                top[0].image(_upscale_img(r["image"]), caption="실물(판매자)",
+            _eimg, _cimg = r.get("image"), r.get("card_image")
+            if pd.notna(_eimg) and _eimg:
+                top[0].image(_upscale_img(_eimg), caption="실물(판매자)",
                              use_container_width=True)
-            if r.get("card_image"):
-                top[1].image(r["card_image"], caption="공식(시세기준)",
+            if pd.notna(_cimg) and _cimg:
+                top[1].image(_cimg, caption="공식(시세기준)",
                              use_container_width=True)
             with top[2]:
                 hc = st.columns([8, 2])
@@ -275,12 +276,14 @@ with tab1:
                 hc[1].markdown(
                     f"<div style='text-align:right;padding-top:10px;color:#888'>⏳ <b>{r['남은시간']}</b></div>",
                     unsafe_allow_html=True)
-                _sfb = int(r.get("seller_feedback") or 0)
+                _sfb = int(r["seller_feedback"]) if pd.notna(r.get("seller_feedback")) else 0
+                _sname = r["seller_name"] if pd.notna(r.get("seller_name")) else "-"
+                _spct = r["seller_pct"] if pd.notna(r.get("seller_pct")) else 0
                 _swarn = ("  ·  ⚠️ **신규/저평판 셀러 — 사기(가짜슬랩·미발송) 주의**"
                           if _sfb < config.SELLER_FLAG_FEEDBACK else "")
                 st.caption(
-                    f"신호 **{lbl}**  ·  👤 셀러 **{r.get('seller_name') or '-'}** "
-                    f"(리뷰 {_sfb} · {r.get('seller_pct') or 0:.0f}%){_swarn}  "
+                    f"신호 **{lbl}**  ·  👤 셀러 **{_sname}** "
+                    f"(리뷰 {_sfb} · {_spct:.0f}%){_swarn}  "
                     "·  📷 왼쪽 두 이미지(실물/공식)가 같은 카드인지 확인하세요")
                 st.toggle("⏱ Gixen 등록 완료 (켜두면 새로고침해도 유지)",
                           value=(r["item_id"] in _gx_marks), key=f"gx_{r['item_id']}",
@@ -289,16 +292,19 @@ with tab1:
             m = st.columns(4)
             m[0].metric("현재가", _money(r["current_bid"]))
             m[1].metric("시세", _money(r["market_value"]),
-                        help=f"실낙찰 표본 {int(r['sold_n'] or 0)}건")
+                        help=f"실낙찰 표본 {int(r['sold_n']) if pd.notna(r.get('sold_n')) else 0}건")
             m[2].metric("권장 최대입찰", _money(r["max_bid"]))
             m[3].metric("예상수익", _money(r["profit"]),
                         help=(f"ROI {r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else None))
 
             _roi = f"**ROI {r['ROI%']:.0f}%**  ·  " if pd.notna(r.get("ROI%")) else ""
+            _sn = int(r["sold_n"]) if pd.notna(r.get("sold_n")) else 0
+            _mn = r["matched_name"] if pd.notna(r.get("matched_name")) else "-"
+            _tr = r["추세"] if isinstance(r.get("추세"), str) else ""
             st.markdown(
                 f"{_roi}**배송 {_money(r['shipping'], 2)}**  ·  역대 {_money(r['all_time_value'])}"
-                f"  ·  표본 {int(r['sold_n'] or 0)}건  ·  손익분기 {_money(r['breakeven_bid'])}"
-                f"  ·  {r['추세'] or ''}  ·  🔗 시세기준: **{r.get('matched_name') or '-'}**")
+                f"  ·  표본 {_sn}건  ·  손익분기 {_money(r['breakeven_bid'])}"
+                f"  ·  {_tr}  ·  🔗 시세기준: **{_mn}**")
 
             _num = links.ebay_item_number(r.get("url"), r.get("item_id"))
             c1, c2, c3, c4 = st.columns([2, 2, 2, 3])
