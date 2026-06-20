@@ -316,7 +316,7 @@ except ValueError:
 st.caption(f"🕒 마지막 수집 {_ago(_last)}{_stale_collect}")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["🎯 비딩 후보", "🔥 인기·거래량", "📒 거래 기록", "📝 입찰 기록", "📊 손익·비용"])
+    ["🎯 비딩 후보", "🔥 인기·거래량", "📒 거래 기록", "📝 입찰 기록", "💼 포트폴리오"])
 
 # ============== 탭 1: 비딩 후보 ==============
 with tab1:
@@ -473,13 +473,15 @@ with tab2:
 with tab3:
     st.caption("내가 실제로 사고판 결과를 기록 → 도구가 잘 맞히는지, 내 수익이 얼마인지 추적합니다.")
     with st.form("add_trade", clear_on_submit=True):
-        f1, f2, f3 = st.columns([3, 1, 1])
+        f1, f2, f3, f4 = st.columns([3, 1, 1, 1])
         t_card = f1.text_input("카드명")
         t_buy = f2.number_input("매입가($)", min_value=0.0, step=1.0)
-        t_sell = f3.number_input("판매가($, 미판매=0)", min_value=0.0, step=1.0)
+        t_mkt = f3.number_input("현재시세($, 선택)", min_value=0.0, step=1.0,
+                                help="보유중 카드의 현재 시세 → 포트폴리오 평가손익 계산")
+        t_sell = f4.number_input("판매가($, 미판매=0)", min_value=0.0, step=1.0)
         t_note = st.text_input("메모 (선택)")
         if st.form_submit_button("기록 추가") and t_card:
-            db.add_trade(t_card, t_buy, t_sell or None, t_note)
+            db.add_trade(t_card, t_buy, t_sell or None, t_note, t_mkt or None)
             st.success("추가됨")
             st.rerun()
 
@@ -553,62 +555,71 @@ with tab4:
     else:
         st.info("아직 입찰 기록이 없습니다. 위에서 추가하거나, 저한테 말하면 저장해드려요.")
 
-# ============== 탭 5: 손익·비용 (고정비 + 매매손익 → 순수익) ==============
+# ============== 탭 5: 투자 포트폴리오 + 비용 ==============
 with tab5:
-    st.caption("구독·LLC 고정비와 매매손익을 한곳에서 추적 — 순수익 = 매매손익 − 비용.")
     db.seed_costs_if_empty()
+    trades_c = db.get_trades()
     costs = db.get_costs()
-    cdf = pd.DataFrame(costs) if costs else pd.DataFrame(
-        columns=["id", "item", "amount", "kind", "period", "note"])
 
     def _annual(amount, kind, period):
-        if kind != "recurring":
-            return 0.0
-        return float(amount) * (12 if period == "monthly" else 1)
+        return float(amount) * (12 if period == "monthly" else 1) if kind == "recurring" else 0.0
 
-    setup_total = float(cdf[cdf["kind"] == "setup"]["amount"].sum()) if len(cdf) else 0.0
-    annual_total = float(sum(_annual(r["amount"], r["kind"], r["period"])
-                            for _, r in cdf.iterrows())) if len(cdf) else 0.0
+    setup_total = float(sum(c["amount"] for c in costs if c["kind"] == "setup"))
+    annual_total = float(sum(_annual(c["amount"], c["kind"], c["period"]) for c in costs))
 
-    trades_c = db.get_trades()
-    realized = float(sum((t["sell"] - t["buy"]) for t in trades_c if t.get("sell"))) \
-        if trades_c else 0.0
-    holding = float(sum(t["buy"] for t in trades_c if not t.get("sell"))) \
-        if trades_c else 0.0
-    net_now = realized - setup_total
+    # ----- 포트폴리오 집계 -----
+    held = [t for t in trades_c if not t.get("sell")]
+    sold = [t for t in trades_c if t.get("sell")]
+    invested_total = float(sum(t["buy"] for t in trades_c))            # 누적 매입 총액
+    held_cost = float(sum(t["buy"] for t in held))                     # 보유 원가
+    held_value = float(sum((t.get("market") or t["buy"]) for t in held))  # 보유 평가액(시세없으면 원가)
+    unrealized = held_value - held_cost                               # 미실현 손익
+    realized = float(sum((t["sell"] - t["buy"]) for t in sold))        # 실현 손익
+    net_pl = realized + unrealized - setup_total                       # 총 순손익(설립비 차감)
 
-    r1 = st.columns(3)
-    r1[0].metric("실현 매매손익", f"${realized:,.0f}")
-    r1[1].metric("보유자산(원가)", f"${holding:,.0f}")
-    r1[2].metric("순손익(실현−설립비)", f"${net_now:,.0f}")
-    r2 = st.columns(3)
-    r2[0].metric("1회성 설립비", f"${setup_total:,.2f}")
-    r2[1].metric("연 고정비", f"${annual_total:,.2f}")
-    r2[2].metric("월 고정비", f"${annual_total/12:,.2f}")
-    st.caption(f"현재 순손익 = 실현 ${realized:,.0f} − 설립비 ${setup_total:,.2f} = "
-               f"**${net_now:,.0f}** · 이후 매년 고정비 약 ${annual_total:,.0f}(월 ${annual_total/12:,.0f}) 발생")
+    st.markdown("#### 💼 투자 포트폴리오")
+    p = st.columns(4)
+    p[0].metric("총 투자원금", f"${invested_total:,.0f}", help="지금까지 카드 매입에 쓴 총액(보유+판매 전체)")
+    p[1].metric("보유 평가액", f"${held_value:,.0f}", help="보유중 카드의 현재시세 합(시세 미입력시 매입가로 계산)")
+    p[2].metric("미실현 손익", f"${unrealized:,.0f}", help="보유 평가액 − 보유 원가")
+    p[3].metric("실현 손익", f"${realized:,.0f}", help="판매완료 카드의 매도−매입")
+
+    if held:
+        hdf = pd.DataFrame(held)
+        if "market" not in hdf:
+            hdf["market"] = None
+        hdf["평가손익"] = hdf.apply(
+            lambda r: round(r["market"] - r["buy"], 2) if pd.notna(r.get("market")) else None, axis=1)
+        st.dataframe(
+            hdf[["id", "card", "buy", "market", "평가손익", "created_at"]].rename(columns={
+                "id": "id", "card": "카드", "buy": "매입가", "market": "현재시세", "created_at": "매입일"}),
+            use_container_width=True, hide_index=True)
+        st.caption("**현재시세**는 **거래 기록 탭**에서 입력(또는 카드 시세검증으로 확인). 미입력 카드는 평가손익 '-'.")
+    else:
+        st.info("보유중인 카드가 없습니다. **거래 기록 탭**에서 매입을 기록하세요.")
+
+    st.divider()
+
+    # ----- 운영 비용 + 순손익 -----
+    st.markdown("#### 🧾 운영 비용")
+    c = st.columns(3)
+    c[0].metric("설립비(1회성)", f"${setup_total:,.0f}")
+    c[1].metric("연 고정비", f"${annual_total:,.0f}", help=f"월 약 ${annual_total/12:,.0f}")
+    c[2].metric("총 순손익", f"${net_pl:,.0f}", help="실현+미실현 − 설립비 (이후 매년 고정비 추가 차감)")
+    st.caption(
+        f"총 순손익 = 실현 \\${realized:,.0f} + 미실현 \\${unrealized:,.0f} − 설립비 \\${setup_total:,.0f} "
+        f"= **\\${net_pl:,.0f}**  ·  이후 매년 고정비 약 \\${annual_total:,.0f}(월 \\${annual_total/12:,.0f}) 발생")
 
     _PER_KO = {"once": "1회", "monthly": "월", "yearly": "년"}
-    if len(cdf):
-        st.markdown("##### 🏗️ 설립비 (1회성)")
-        sdf = cdf[cdf["kind"] == "setup"].copy()
-        if len(sdf):
-            sdf["금액"] = sdf["amount"].map(lambda v: f"${v:,.2f}")
-            st.dataframe(sdf[["id", "item", "금액", "note"]].rename(
+    with st.expander("비용 내역 보기 / 추가 / 삭제"):
+        if costs:
+            cdf = pd.DataFrame(costs)
+            cdf["금액"] = cdf["amount"].map(lambda v: f"${v:,.2f}")
+            cdf["구분"] = cdf["kind"].map(lambda k: "설립비" if k == "setup" else "고정비")
+            cdf["주기"] = cdf["period"].map(lambda x: _PER_KO.get(x, x))
+            st.dataframe(cdf[["id", "구분", "item", "금액", "주기", "note"]].rename(
                 columns={"item": "항목", "note": "메모"}),
                 use_container_width=True, hide_index=True)
-        st.markdown("##### 🔁 고정비 (반복)")
-        rdf = cdf[cdf["kind"] == "recurring"].copy()
-        if len(rdf):
-            rdf["금액"] = rdf["amount"].map(lambda v: f"${v:,.2f}")
-            rdf["주기"] = rdf["period"].map(lambda p: _PER_KO.get(p, p))
-            rdf["연환산"] = rdf.apply(
-                lambda r: f"${_annual(r['amount'], r['kind'], r['period']):,.2f}", axis=1)
-            st.dataframe(rdf[["id", "item", "금액", "주기", "연환산", "note"]].rename(
-                columns={"item": "항목", "note": "메모"}),
-                use_container_width=True, hide_index=True)
-
-    with st.expander("➕ 비용 항목 추가 / 삭제"):
         with st.form("add_cost", clear_on_submit=True):
             c1, c2 = st.columns([3, 1])
             ci = c1.text_input("항목명")

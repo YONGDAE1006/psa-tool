@@ -236,16 +236,27 @@ def _ensure_trades(conn):
                id INTEGER PRIMARY KEY AUTOINCREMENT,
                created_at TEXT, card TEXT, buy REAL, sell REAL, note TEXT)"""
     )
+    try:                                   # 현재시세(평가손익 계산용) — 보유중 카드 평가
+        conn.execute("ALTER TABLE trades ADD COLUMN market REAL")
+    except sqlite3.OperationalError:
+        pass
 
 
-def add_trade(card, buy, sell, note):
+def add_trade(card, buy, sell, note, market=None):
     import datetime as _dt
     with get_conn() as conn:
         _ensure_trades(conn)
         conn.execute(
-            "INSERT INTO trades (created_at, card, buy, sell, note) VALUES (?, ?, ?, ?, ?)",
-            (_dt.datetime.now().strftime("%Y-%m-%d"), card, buy, sell, note),
+            "INSERT INTO trades (created_at, card, buy, sell, note, market) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (_dt.datetime.now().strftime("%Y-%m-%d"), card, buy, sell, note, market),
         )
+
+
+def update_trade_market(trade_id, market):
+    with get_conn() as conn:
+        _ensure_trades(conn)
+        conn.execute("UPDATE trades SET market = ? WHERE id = ?", (market, trade_id))
 
 
 def get_trades():
