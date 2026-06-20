@@ -381,9 +381,9 @@ def _ppt_resolve_id(name, card_number, base, title=""):
     #          플래그) 핵심 카드명만 남아도 엉뚱한 카드 매칭 위험 없음.
     if qn and not matched:
         toks = name.split()
-        for i in range(1, len(toks) - 1):        # 핵심 끝 2토큰(예: 'Crobat ex')은 항상 유지
+        for i in range(1, len(toks)):            # 끝 1토큰까지 떼며 시도(번호일치 필수라 안전)
             b3, m3 = pick(fetch(f"{' '.join(toks[i:])} {card_number}".strip(), 5))
-            if m3:
+            if m3:                                # 'Crobat ex 234', 'Raticate 202' 등에서 매칭
                 best, matched = b3, True
                 break
 
