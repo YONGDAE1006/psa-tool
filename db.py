@@ -260,6 +260,42 @@ def delete_trade(trade_id):
         conn.execute("DELETE FROM trades WHERE id = ?", (trade_id,))
 
 
+# ---------- 입찰 기록(Gixen 스나이핑 결과 추적) ----------
+def _ensure_bidlog(conn):
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS bid_log (
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               created_at TEXT, item_id TEXT, card TEXT,
+               my_bid REAL, final_price REAL, market_value REAL,
+               result TEXT, note TEXT)"""
+    )
+
+
+def add_bid(card, my_bid, final_price, market_value, result, item_id="", note="", when=None):
+    import datetime as _dt
+    with get_conn() as conn:
+        _ensure_bidlog(conn)
+        conn.execute(
+            """INSERT INTO bid_log
+               (created_at, item_id, card, my_bid, final_price, market_value, result, note)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (when or _dt.datetime.now().strftime("%Y-%m-%d"), item_id, card,
+             my_bid, final_price, market_value, result, note),
+        )
+
+
+def get_bids():
+    with get_conn() as conn:
+        _ensure_bidlog(conn)
+        return [dict(r) for r in conn.execute("SELECT * FROM bid_log ORDER BY id DESC")]
+
+
+def delete_bid(bid_id):
+    with get_conn() as conn:
+        _ensure_bidlog(conn)
+        conn.execute("DELETE FROM bid_log WHERE id = ?", (bid_id,))
+
+
 # ---------- Gixen 등록 체크(새로고침/재시작에도 유지) ----------
 def _ensure_gixen(conn):
     conn.execute("CREATE TABLE IF NOT EXISTS gixen_marks (item_id TEXT PRIMARY KEY, at TEXT)")

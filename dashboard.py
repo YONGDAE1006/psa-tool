@@ -224,7 +224,7 @@ except ValueError:
 st.caption(f"🕒 마지막 수집: **{_ago(_last)}**{_stale_collect}  ·  최신화는 사이드바 **새로고침** 또는 F5")
 st.caption("⚠️ 경매는 막판에 가격이 뛸 수 있습니다(스나이핑). ROI는 '기회 신호'이지 확정 수익이 아닙니다.")
 
-tab1, tab2, tab3 = st.tabs(["🎯 비딩 후보", "🔥 인기·거래량", "📒 거래 기록"])
+tab1, tab2, tab3, tab4 = st.tabs(["🎯 비딩 후보", "🔥 인기·거래량", "📒 거래 기록", "📝 입찰 기록"])
 
 # ============== 탭 1: 비딩 후보 ==============
 with tab1:
@@ -389,6 +389,54 @@ with tab3:
             st.rerun()
     else:
         st.info("아직 기록이 없습니다. 위에서 추가해보세요.")
+
+# ============== 탭 4: 입찰 기록 (Gixen 스나이핑 결과) ==============
+with tab4:
+    st.caption("Gixen 입찰 결과 추적 → 내 입찰가가 적정했는지, 좋은 걸 아슬아슬하게 놓쳤는지 분석.")
+    with st.form("add_bid", clear_on_submit=True):
+        b1, b2, b3, b4 = st.columns([3, 1, 1, 1])
+        bcard = b1.text_input("카드명")
+        bmy = b2.number_input("내 입찰가($)", min_value=0.0, step=1.0)
+        bfin = b3.number_input("최종 낙찰가($)", min_value=0.0, step=1.0)
+        bval = b4.number_input("시세($)", min_value=0.0, step=1.0)
+        bres = st.selectbox("결과", ["패찰", "낙찰", "진행중"])
+        if st.form_submit_button("입찰 기록 추가") and bcard:
+            db.add_bid(bcard, bmy, bfin or None, bval or None, bres, note="수동입력")
+            st.success("추가됨")
+            st.rerun()
+
+    bids = db.get_bids()
+    if bids:
+        bdf = pd.DataFrame(bids)
+        bdf["놓친이득"] = bdf.apply(
+            lambda r: round(r["market_value"] - r["final_price"], 2)
+            if (r["result"] == "패찰" and pd.notna(r["market_value"]) and pd.notna(r["final_price"]))
+            else None, axis=1)
+        bdf["차이"] = bdf.apply(
+            lambda r: round((r["final_price"] or 0) - (r["my_bid"] or 0), 2)
+            if pd.notna(r["final_price"]) else None, axis=1)
+        m1, m2, m3 = st.columns(3)
+        m1.metric("총 입찰", len(bdf))
+        won = int((bdf["result"] == "낙찰").sum())
+        m2.metric("낙찰률", f"{won/len(bdf)*100:.0f}%" if len(bdf) else "0%")
+        m3.metric("패찰로 놓친 이득(합)",
+                  f"${bdf['놓친이득'].dropna().clip(lower=0).sum():,.0f}",
+                  help="시세보다 싸게 낙찰된 걸 패찰한 경우 = 조금만 더 썼으면 먹었을 이득")
+        st.dataframe(
+            bdf[["id", "created_at", "card", "my_bid", "final_price", "차이",
+                 "market_value", "놓친이득", "result"]].rename(columns={
+                     "created_at": "날짜", "card": "카드", "my_bid": "내입찰",
+                     "final_price": "최종가", "market_value": "시세", "result": "결과"}),
+            use_container_width=True, hide_index=True,
+        )
+        st.caption("**차이** = 최종가 − 내입찰(얼마 차로 졌나) · **놓친이득** = 시세 − 최종가"
+                   "(패찰인데 시세보다 싸게 팔림 = 조금만 더 썼으면 먹었을 이득)")
+        did = st.number_input("삭제할 입찰 id", min_value=0, step=1, value=0, key="del_bid")
+        if st.button("입찰 기록 삭제") and did:
+            db.delete_bid(int(did))
+            st.rerun()
+    else:
+        st.info("아직 입찰 기록이 없습니다. 위에서 추가하거나, 저한테 말하면 저장해드려요.")
 
 st.divider()
 with st.expander("계산 방식 / 시세 로직 보는 법"):
