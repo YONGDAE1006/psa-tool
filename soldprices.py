@@ -69,6 +69,8 @@ _PPT_ABBR = {
 def _ppt_query(text):
     """PPT 검색용 깔끔한 문자열 (긴 제목에서 카드 이름만 추출)."""
     t = text or ""
+    # 소유격 's 제거 (Rocket's->Rocket). 안 하면 'Rocket s'(외톨이 s)로 PPT 검색이 0건 됨.
+    t = re.sub(r"[’‘'`]s\b", "", t, flags=re.I)
     # 악센트 정규화 (Pokémon -> Pokemon)
     t = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode()
     t = re.sub(r"\d+\s*/\s*\d+", " ", t)   # 215/203 같은 번호 제거
