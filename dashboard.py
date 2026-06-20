@@ -50,7 +50,7 @@ st.markdown("""
 .stApp { background:#0a0b0f; }
 .block-container { padding-top:1.4rem; padding-bottom:3rem; max-width:1480px; }
 html, body, [class*="css"], p, span, label, div { font-family:'Pretendard','Inter','Segoe UI',sans-serif; }
-.stApp, .stApp p, .stApp label, .stApp span { color:#cbd2dd; }
+.stApp, .stApp p, .stApp label, .stApp span { color:#e3e7ee; }
 
 /* ===== 헤더 ===== */
 h1 { font-weight:600 !important; letter-spacing:-.5px;
@@ -91,7 +91,7 @@ h4 { font-weight:600 !important; color:#f4f5f7 !important; }
 input, textarea, [data-baseweb="input"]{ background:#1a1d25 !important; color:#f4f5f7 !important; }
 [data-testid="stTabs"] [data-baseweb="tab"]{ font-weight:600; font-size:.98rem; color:#9ca3af; }
 [data-testid="stTabs"] [aria-selected="true"]{ color:#fbbf24 !important; }
-[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] *{ color:#7a8290 !important; }
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] *{ color:#9aa3b2 !important; }
 section[data-testid="stSidebar"]{ background:#0d0f14; border-right:1px solid rgba(255,255,255,.06); }
 [data-testid="stExpander"]{ background:#111319; border:1px solid rgba(255,255,255,.07); border-radius:12px; }
 </style>
@@ -151,7 +151,14 @@ if st.sidebar.button("🔄 데이터 새로고침 (eBay 다시 수집)"):
             st.sidebar.error(f"수집 실패: {e}")
 
 # ---------------- 본문 ----------------
-st.title("🃏 Pokemon PSA 10 — 종료임박 비딩 대시보드")
+st.markdown(
+    "<div style='display:flex;align-items:center;gap:12px;margin:2px 0 4px'>"
+    "<div style='width:32px;height:32px;border-radius:9px;flex-shrink:0;"
+    "background:linear-gradient(135deg,#fbbf24,#fb7c3c)'></div>"
+    "<span style='font-size:26px;font-weight:700;letter-spacing:-.5px;"
+    "background:linear-gradient(90deg,#fbbf24,#fb7c5c);-webkit-background-clip:text;"
+    "-webkit-text-fill-color:transparent'>Pokemon PSA 10 — 종료임박 비딩 대시보드</span>"
+    "</div>", unsafe_allow_html=True)
 _loc = config.ITEM_LOCATION_COUNTRY or "전체"
 st.caption(f"입찰 {config.MIN_BID_COUNT}건+ · 배송 ${config.MAX_SHIPPING:.0f} 이하 · "
            f"예산 ${config.MAX_BID:.0f} · 영어판 · 종료임박순")
@@ -362,17 +369,28 @@ with tab1:
                 r["ROI%"] = (_mv["roi"] * 100) if _mv["roi"] is not None else None
                 r["value_source"] = "manual"
 
-            m = st.columns(4)
-            m[0].metric("현재가", _money(r["current_bid"]))
-            m[1].metric("시세", _money(r["market_value"]),
-                        help=("수동(PriceCharting)" if r.get("value_source") == "manual"
-                              else f"실낙찰 표본 {int(r['sold_n']) if pd.notna(r.get('sold_n')) else 0}건"))
-            m[2].metric("권장 최대입찰", _money(r["max_bid"]))
-            m[3].metric("예상수익", _money(r["profit"]),
-                        help=(f"ROI {r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else None))
+            _pf = r.get("profit")
+            _pos = pd.notna(_pf) and _pf > 0
+            _neg = pd.notna(_pf) and _pf < 0
+            _pcol = "#4ade80" if _pos else ("#f87171" if _neg else "#f4f5f7")
+            _pbg = "rgba(74,222,128,.10)" if _pos else ("rgba(248,113,113,.08)" if _neg else "#1a1d25")
+
+            def _mc(lab, val, col="#f4f5f7", bg="#1a1d25"):
+                return (f"<div style='flex:1;min-width:0;background:{bg};border-radius:11px;padding:11px 14px'>"
+                        f"<div style='font-size:12px;color:#9aa3b2'>{lab}</div>"
+                        f"<div style='font-size:20px;font-weight:700;color:{col};margin-top:3px'>{val}</div></div>")
+            st.markdown(
+                "<div style='display:flex;gap:11px;margin:14px 0 10px'>"
+                + _mc("현재가", _money(r["current_bid"]))
+                + _mc("시세", _money(r["market_value"]))
+                + _mc("권장 최대입찰", _money(r["max_bid"]), "#fbbf24")
+                + _mc("예상수익", _money(r["profit"]), _pcol, _pbg)
+                + "</div>", unsafe_allow_html=True)
 
             _mn = r["matched_name"] if pd.notna(r.get("matched_name")) else "-"
-            st.caption(f"손익분기 {_money(r['breakeven_bid'])} · 시세기준 {_mn}")
+            _sn = int(r["sold_n"]) if pd.notna(r.get("sold_n")) else 0
+            _roi_s = f" · ROI {r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else ""
+            st.caption(f"손익분기 {_money(r['breakeven_bid'])} · 표본 {_sn}건{_roi_s} · 시세기준 {_mn}")
             if (pd.notna(r.get("market_value")) and r.get("current_bid")
                     and r["market_value"] > r["current_bid"] * 4):
                 st.caption("⚠️ 시세가 현재가 4배+ — 오매칭 의심, 이미지·세트 확인")
