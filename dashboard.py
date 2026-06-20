@@ -46,57 +46,54 @@ st.set_page_config(page_title="Pokemon PSA10 비딩 대시보드", layout="wide"
 
 st.markdown("""
 <style>
-/* ===== 전역 테마 ===== */
-.stApp { background: linear-gradient(180deg,#f6f8fc 0%,#eceff7 100%); }
-.block-container { padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1480px; }
-html, body, [class*="css"] { font-family: 'Pretendard','Inter','Segoe UI',sans-serif; }
+/* ===== 다크 프리미엄 테마 ===== */
+.stApp { background:#0a0b0f; }
+.block-container { padding-top:1.4rem; padding-bottom:3rem; max-width:1480px; }
+html, body, [class*="css"], p, span, label, div { font-family:'Pretendard','Inter','Segoe UI',sans-serif; }
+.stApp, .stApp p, .stApp label, .stApp span { color:#cbd2dd; }
 
 /* ===== 헤더 ===== */
-h1 { font-weight: 800 !important; letter-spacing:-.6px; color:#1e293b;
-     background: linear-gradient(90deg,#4f46e5,#7c3aed); -webkit-background-clip:text;
+h1 { font-weight:600 !important; letter-spacing:-.5px;
+     background:linear-gradient(90deg,#fbbf24,#fb7c5c); -webkit-background-clip:text;
      -webkit-text-fill-color:transparent; }
-h2,h3 { font-weight: 750 !important; color:#1e293b; letter-spacing:-.3px; }
-h4 { font-weight: 700 !important; color:#0f172a; }
+h2,h3 { font-weight:600 !important; color:#f4f5f7 !important; letter-spacing:-.3px; }
+h4 { font-weight:600 !important; color:#f4f5f7 !important; }
 
-/* ===== 카드(bordered container) ===== */
+/* ===== 카드 ===== */
 [data-testid="stVerticalBlockBorderWrapper"]{
-  background:#fff; border:1px solid #e7eaf3 !important; border-radius:18px !important;
-  box-shadow:0 1px 2px rgba(15,23,42,.04), 0 6px 18px rgba(15,23,42,.06);
-  padding:8px 16px 12px; margin-bottom:6px;
-  transition:box-shadow .22s ease, transform .22s ease, border-color .22s ease;
+  background:#111319; border:1px solid rgba(255,255,255,.08) !important; border-radius:16px !important;
+  padding:10px 18px 14px; margin-bottom:8px;
+  transition:border-color .2s ease, transform .2s ease;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:hover{
-  box-shadow:0 10px 30px rgba(79,70,229,.13); transform:translateY(-3px);
-  border-color:#c7d2fe !important;
+  border-color:rgba(251,191,36,.40) !important; transform:translateY(-2px);
 }
 
 /* ===== 메트릭 ===== */
 [data-testid="stMetric"]{
-  background:linear-gradient(180deg,#fbfcfe,#f3f5fb); border:1px solid #eaeef6;
-  border-radius:14px; padding:12px 16px;
+  background:#1a1d25; border:1px solid rgba(255,255,255,.05);
+  border-radius:12px; padding:12px 15px;
 }
-[data-testid="stMetricValue"]{ font-weight:800 !important; font-size:1.45rem !important; color:#0f172a; }
-[data-testid="stMetricLabel"]{ font-weight:600 !important; color:#64748b; }
+[data-testid="stMetricValue"]{ font-weight:600 !important; font-size:1.42rem !important; color:#f4f5f7 !important; }
+[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] *{ color:#8b91a0 !important; }
 
 /* ===== 버튼 ===== */
 .stButton>button, .stLinkButton>a{
-  border-radius:11px !important; font-weight:650 !important; border:1px solid #e2e6f0 !important;
-  transition:all .15s ease; padding:.35rem .9rem;
+  background:#1f2330 !important; color:#e5e7eb !important; border-radius:9px !important;
+  font-weight:500 !important; border:1px solid rgba(255,255,255,.1) !important; transition:all .15s ease;
 }
 .stButton>button:hover, .stLinkButton>a:hover{
-  border-color:#6366f1 !important; color:#4f46e5 !important;
-  box-shadow:0 3px 10px rgba(99,102,241,.18);
+  border-color:#fbbf24 !important; color:#fbbf24 !important;
 }
 
-/* ===== 이미지/입력/탭 ===== */
-[data-testid="stImage"] img{ border-radius:14px; box-shadow:0 2px 10px rgba(15,23,42,.10); }
-[data-testid="stNumberInput"] input{ border-radius:9px; }
-[data-testid="stTabs"] [data-baseweb="tab"]{ font-weight:700; font-size:.98rem; }
-[data-testid="stTabs"] [aria-selected="true"]{ color:#4f46e5 !important; }
-
-/* ===== 토글/캡션 ===== */
-[data-testid="stCaptionContainer"]{ color:#64748b; }
-section[data-testid="stSidebar"]{ background:#f8fafc; border-right:1px solid #e7eaf3; }
+/* ===== 이미지/입력/탭/사이드바 ===== */
+[data-testid="stImage"] img{ border-radius:12px; border:1px solid rgba(255,255,255,.07); }
+input, textarea, [data-baseweb="input"]{ background:#1a1d25 !important; color:#f4f5f7 !important; }
+[data-testid="stTabs"] [data-baseweb="tab"]{ font-weight:600; font-size:.98rem; color:#9ca3af; }
+[data-testid="stTabs"] [aria-selected="true"]{ color:#fbbf24 !important; }
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] *{ color:#7a8290 !important; }
+section[data-testid="stSidebar"]{ background:#0d0f14; border-right:1px solid rgba(255,255,255,.06); }
+[data-testid="stExpander"]{ background:#111319; border:1px solid rgba(255,255,255,.07); border-radius:12px; }
 </style>
 """, unsafe_allow_html=True)
 
