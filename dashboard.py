@@ -25,10 +25,11 @@ def _upscale_img(url):
 def _card_img_html(url, cap):
     """실물·공식 이미지를 인라인 스타일로 직접 렌더 → Streamlit DOM 변화와 무관하게
     두 이미지가 항상 동일한 박스 크기로 통일됨. (CSS testid 선택자 의존 제거.)
-    카드 비율(5:7)에 맞춘 고정박스 + object-fit:cover로 둘 다 꽉 채워 크기 일치."""
+    카드 비율(5:7) 고정박스 + object-fit:contain → 크기 통일하면서 이미지는
+    절대 안 잘림(상품정보/PSA라벨 보존). 비율차이는 어두운 여백으로 채움."""
     return (
         "<div style='text-align:center'>"
-        f"<img src='{url}' style='width:100%;aspect-ratio:5/7;object-fit:cover;"
+        f"<img src='{url}' style='width:100%;aspect-ratio:5/7;object-fit:contain;"
         "object-position:center;display:block;border-radius:12px;"
         "border:1px solid rgba(255,255,255,.10);background:#0c0e13'/>"
         f"<div style='color:#9aa3b2;font-size:.78rem;margin-top:4px'>{cap}</div>"
