@@ -431,6 +431,12 @@ with tab1:
                 "내 최대입찰가($)", min_value=0.0, step=1.0,
                 value=float(round(r["max_bid"], 2)) if pd.notna(r.get("max_bid")) else 0.0,
                 key=f"bid_{r['item_id']}")
+            # Gixen 수동 등록용: eBay 아이템번호 + 권장입찰가(복사해서 Gixen에 붙여넣기)
+            _itemno = links.ebay_item_number(r.get("url"), r.get("item_id"))
+            if _itemno:
+                _bidv = f"{r['max_bid']:.2f}" if pd.notna(r.get("max_bid")) else "-"
+                st.caption(f"🅖 Gixen 등록용 → 아이템번호 `{_itemno}` · 권장입찰가 \\${_bidv} "
+                           "(복사해 Gixen에 붙여넣은 뒤 위 Gixen 토글 체크)")
             _mp_key = f"mp_{r['item_id']}"
             st.number_input("✏️ 수동 시세($) — 이 카드 전체 적용, 0=해제",
                 min_value=0.0, value=float(_manual or 0), step=1.0, key=_mp_key,
