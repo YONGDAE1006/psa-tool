@@ -96,6 +96,10 @@ df = pd.DataFrame(rows)
 df["secs_left"] = df["end_time"].apply(time_left)
 # 이미 종료된 경매 제외(다음 수집 전까지 DB에 남아있어도 입찰 불가). 종료시각 불명(None)은 유지.
 df = df[df["secs_left"].isna() | (df["secs_left"] > 0)].reset_index(drop=True)
+if df.empty:
+    st.warning("진행 중인 경매가 없습니다 (수집된 매물이 모두 종료됨). "
+               "다음 자동수집을 기다리거나, 사이드바 **새로고침**을 누르세요.")
+    st.stop()
 df["남은시간"] = df["secs_left"].apply(fmt_left)
 df["ROI%"] = df["roi"].apply(lambda x: round(x * 100, 1) if x is not None else None)
 
