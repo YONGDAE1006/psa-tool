@@ -305,6 +305,10 @@ with tab1:
                 f"{_roi}**배송 {_money(r['shipping'], 2)}**  ·  역대 {_money(r['all_time_value'])}"
                 f"  ·  표본 {_sn}건  ·  손익분기 {_money(r['breakeven_bid'])}"
                 f"  ·  {_tr}  ·  🔗 시세기준: **{_mn}**")
+            if (pd.notna(r.get("market_value")) and r.get("current_bid")
+                    and r["market_value"] > r["current_bid"] * 4):
+                st.caption("⚠️ **시세가 현재가의 4배+** — 진짜 스틸일 수도 있지만, 같은 번호 다른 세트로 "
+                           "잘못 매칭됐을 가능성도 큽니다. 위 두 이미지와 **'시세기준' 세트명**을 꼭 확인하세요.")
 
             _num = links.ebay_item_number(r.get("url"), r.get("item_id"))
             c1, c2, c3, c4 = st.columns([2, 2, 2, 3])

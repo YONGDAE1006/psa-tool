@@ -107,7 +107,7 @@ def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=Fa
 
     try:
         if provider == "pokemonpricetracker":
-            data = _ppt(name, card_number, tcgplayer_id)
+            data = _ppt(name, card_number, tcgplayer_id, title or query or "")
         elif provider == "ebay_insights":
             data = _ebay_insights(name)
         else:
@@ -243,14 +243,14 @@ def _ppt_get(url, params):
     return None
 
 
-def _ppt(name, card_number, tcgplayer_id):
+def _ppt(name, card_number, tcgplayer_id, title=""):
     if not config.PPT_API_KEYS:
         return None
     base = config.PPT_BASE_URL.rstrip("/")
 
     num_confirmed = bool(tcgplayer_id)        # 외부에서 명시한 id면 신뢰
     if not tcgplayer_id:
-        tcgplayer_id, num_confirmed = _ppt_resolve_id(name, card_number, base)
+        tcgplayer_id, num_confirmed = _ppt_resolve_id(name, card_number, base, title)
     if not tcgplayer_id:
         return None
 
@@ -297,7 +297,7 @@ def _ppt(name, card_number, tcgplayer_id):
     }
 
 
-def _ppt_resolve_id(name, card_number, base):
+def _ppt_resolve_id(name, card_number, base, title=""):
     """이름(+카드번호) -> (tcgPlayerId, num_confirmed).
 
     - 번호가 있으면 '이름 번호'로 검색(예: 'Charizard ex 183') → 그 카드 1건을 정확히 집고
@@ -307,6 +307,7 @@ def _ppt_resolve_id(name, card_number, base):
     - 번호가 없으면 이름 유사도로만 고르되 미확정(False)으로 표시.
     """
     qn = _norm_num(card_number)                 # 비교/캐시용 정규화 번호('027'->'27')
+    title_low = (title or "").lower()           # 세트충돌 해소용 제목 원문
     cache_key = f"{name} #{qn}" if qn else name
     cached = db.get_id_cache(cache_key)
     if cached:
@@ -328,6 +329,12 @@ def _ppt_resolve_id(name, card_number, base):
                     matched = True
                 else:
                     score -= 30          # 번호 불일치 = 강한 페널티
+            # 세트충돌 해소: 후보 setName 주요단어가 제목 원문에 있으면 가산
+            # (같은 번호 다른 세트 — First Partner #038 vs Mega Evolution #038 구분)
+            sw = [w for w in re.findall(r"[a-z]{4,}", (it.get("setName") or "").lower())
+                  if w not in ("promo", "collection", "pokemon", "trainer", "gallery", "pack")]
+            if title_low and sw and any(w in title_low for w in sw):
+                score += 25
             if score > best_score:
                 best_score, best = score, it
         return best, matched
