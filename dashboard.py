@@ -88,6 +88,8 @@ h4 { font-weight:600 !important; color:#f4f5f7 !important; }
 
 /* ===== 이미지/입력/탭/사이드바 ===== */
 [data-testid="stImage"] img{ border-radius:12px; border:1px solid rgba(255,255,255,.07); }
+[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stImage"] img{
+  height:155px !important; object-fit:contain; background:#0c0e13; width:100%; }
 input, textarea, [data-baseweb="input"]{ background:#1a1d25 !important; color:#f4f5f7 !important; }
 [data-testid="stTabs"] [data-baseweb="tab"]{ font-weight:600; font-size:.98rem; color:#9ca3af; }
 [data-testid="stTabs"] [aria-selected="true"]{ color:#fbbf24 !important; }
