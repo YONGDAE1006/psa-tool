@@ -375,6 +375,18 @@ def _ppt_resolve_id(name, card_number, base, title=""):
         if m2:
             best, matched = b2, True
 
+    # 3차 폴백: 트레이너 프리픽스 카드("Team Rocket's Crobat ex" 등)는 PPT가 앞단어가
+    #          붙으면 0건 반환("Crobat ex 234"는 됨) → 앞 토큰을 하나씩 떼며
+    #          '뒤토큰들 + 번호'로 재검색. 번호일치(qn==c)를 필수로 요구하므로(matched
+    #          플래그) 핵심 카드명만 남아도 엉뚱한 카드 매칭 위험 없음.
+    if qn and not matched:
+        toks = name.split()
+        for i in range(1, len(toks) - 1):        # 핵심 끝 2토큰(예: 'Crobat ex')은 항상 유지
+            b3, m3 = pick(fetch(f"{' '.join(toks[i:])} {card_number}".strip(), 5))
+            if m3:
+                best, matched = b3, True
+                break
+
     # 제목에 번호가 있는데 끝내 일치 못 찾으면 = 엉뚱한 카드 위험 → 포기(오매칭 방지)
     if qn and not matched:
         return None, False

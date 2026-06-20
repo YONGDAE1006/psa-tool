@@ -315,7 +315,8 @@ except ValueError:
     pass
 st.caption(f"🕒 마지막 수집 {_ago(_last)}{_stale_collect}")
 
-tab1, tab2, tab3, tab4 = st.tabs(["🎯 비딩 후보", "🔥 인기·거래량", "📒 거래 기록", "📝 입찰 기록"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["🎯 비딩 후보", "🔥 인기·거래량", "📒 거래 기록", "📝 입찰 기록", "📊 손익·비용"])
 
 # ============== 탭 1: 비딩 후보 ==============
 with tab1:
@@ -551,6 +552,81 @@ with tab4:
             st.rerun()
     else:
         st.info("아직 입찰 기록이 없습니다. 위에서 추가하거나, 저한테 말하면 저장해드려요.")
+
+# ============== 탭 5: 손익·비용 (고정비 + 매매손익 → 순수익) ==============
+with tab5:
+    st.caption("구독·LLC 고정비와 매매손익을 한곳에서 추적 — 순수익 = 매매손익 − 비용.")
+    db.seed_costs_if_empty()
+    costs = db.get_costs()
+    cdf = pd.DataFrame(costs) if costs else pd.DataFrame(
+        columns=["id", "item", "amount", "kind", "period", "note"])
+
+    def _annual(amount, kind, period):
+        if kind != "recurring":
+            return 0.0
+        return float(amount) * (12 if period == "monthly" else 1)
+
+    setup_total = float(cdf[cdf["kind"] == "setup"]["amount"].sum()) if len(cdf) else 0.0
+    annual_total = float(sum(_annual(r["amount"], r["kind"], r["period"])
+                            for _, r in cdf.iterrows())) if len(cdf) else 0.0
+
+    trades_c = db.get_trades()
+    realized = float(sum((t["sell"] - t["buy"]) for t in trades_c if t.get("sell"))) \
+        if trades_c else 0.0
+    holding = float(sum(t["buy"] for t in trades_c if not t.get("sell"))) \
+        if trades_c else 0.0
+    net_now = realized - setup_total
+
+    r1 = st.columns(3)
+    r1[0].metric("실현 매매손익", f"${realized:,.0f}")
+    r1[1].metric("보유자산(원가)", f"${holding:,.0f}")
+    r1[2].metric("순손익(실현−설립비)", f"${net_now:,.0f}")
+    r2 = st.columns(3)
+    r2[0].metric("1회성 설립비", f"${setup_total:,.2f}")
+    r2[1].metric("연 고정비", f"${annual_total:,.2f}")
+    r2[2].metric("월 고정비", f"${annual_total/12:,.2f}")
+    st.caption(f"현재 순손익 = 실현 ${realized:,.0f} − 설립비 ${setup_total:,.2f} = "
+               f"**${net_now:,.0f}** · 이후 매년 고정비 약 ${annual_total:,.0f}(월 ${annual_total/12:,.0f}) 발생")
+
+    _PER_KO = {"once": "1회", "monthly": "월", "yearly": "년"}
+    if len(cdf):
+        st.markdown("##### 🏗️ 설립비 (1회성)")
+        sdf = cdf[cdf["kind"] == "setup"].copy()
+        if len(sdf):
+            sdf["금액"] = sdf["amount"].map(lambda v: f"${v:,.2f}")
+            st.dataframe(sdf[["id", "item", "금액", "note"]].rename(
+                columns={"item": "항목", "note": "메모"}),
+                use_container_width=True, hide_index=True)
+        st.markdown("##### 🔁 고정비 (반복)")
+        rdf = cdf[cdf["kind"] == "recurring"].copy()
+        if len(rdf):
+            rdf["금액"] = rdf["amount"].map(lambda v: f"${v:,.2f}")
+            rdf["주기"] = rdf["period"].map(lambda p: _PER_KO.get(p, p))
+            rdf["연환산"] = rdf.apply(
+                lambda r: f"${_annual(r['amount'], r['kind'], r['period']):,.2f}", axis=1)
+            st.dataframe(rdf[["id", "item", "금액", "주기", "연환산", "note"]].rename(
+                columns={"item": "항목", "note": "메모"}),
+                use_container_width=True, hide_index=True)
+
+    with st.expander("➕ 비용 항목 추가 / 삭제"):
+        with st.form("add_cost", clear_on_submit=True):
+            c1, c2 = st.columns([3, 1])
+            ci = c1.text_input("항목명")
+            ca = c2.number_input("금액($)", min_value=0.0, step=1.0)
+            c3, c4 = st.columns(2)
+            ck = c3.selectbox("종류", ["recurring", "setup"],
+                              format_func=lambda x: "반복(고정비)" if x == "recurring" else "1회성(설립비)")
+            cp = c4.selectbox("주기", ["yearly", "monthly", "once"],
+                              format_func=lambda x: _PER_KO[x])
+            cn = st.text_input("메모(선택)")
+            if st.form_submit_button("비용 추가") and ci:
+                db.add_cost(ci, ca, ck, "once" if ck == "setup" else cp, cn)
+                st.success("추가됨")
+                st.rerun()
+        dcid = st.number_input("삭제할 비용 id", min_value=0, step=1, value=0, key="del_cost")
+        if st.button("비용 삭제") and dcid:
+            db.delete_cost(int(dcid))
+            st.rerun()
 
 st.divider()
 with st.expander("계산 방식 / 시세 로직 보는 법"):

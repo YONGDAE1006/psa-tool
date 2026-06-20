@@ -317,6 +317,84 @@ def delete_bid(bid_id):
         conn.execute("DELETE FROM bid_log WHERE id = ?", (bid_id,))
 
 
+# ---------- 운영 비용(고정비·설립비) 추적 ----------
+def _ensure_costs(conn):
+    """kind: 'setup'(1회성) / 'recurring'(반복). period: 'once'/'monthly'/'yearly'."""
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS costs (
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               created_at TEXT, item TEXT, amount REAL,
+               kind TEXT, period TEXT, note TEXT)"""
+    )
+
+
+# 최초 1회 자동 시드(사용자가 지우면 다시 안 넣음 — seeded 플래그를 notified 테이블에 기록)
+_COST_SEED = [
+    # (item, amount, kind, period, note)
+    ("Northwest 설립대행(−20%)", 31.20, "setup", "once", "WY LLC 설립"),
+    ("WY 주 등록비", 103.00, "setup", "once", "Wyoming State Fee"),
+    ("EIN (US Tax ID)", 200.00, "setup", "once", "비미국인 발급 대행"),
+    ("PPT PRO", 9.99, "recurring", "monthly", "시세 자동소스(주력)"),
+    ("Gixen Mirror", 11.99, "recurring", "yearly", "스나이핑 무제한+이중화"),
+    ("Northwest 등록대리인(RA)", 125.00, "recurring", "yearly", "LLC 유지(2년차~)"),
+    ("WY 연차보고서", 60.00, "recurring", "yearly", "회사유지 의무(내년 6월~)"),
+]
+
+
+def seed_costs_if_empty():
+    """costs 테이블이 한 번도 시드된 적 없으면 기본 비용 항목을 넣는다(1회만)."""
+    import datetime as _dt
+    with get_conn() as conn:
+        _ensure_costs(conn)
+        flag = conn.execute(
+            "SELECT 1 FROM costs LIMIT 1").fetchone()
+        seeded = conn.execute(
+            "SELECT value FROM meta WHERE key='costs_seeded'").fetchone() \
+            if _has_meta(conn) else None
+        if flag or seeded:
+            return
+        now = _dt.datetime.now().strftime("%Y-%m-%d")
+        conn.executemany(
+            "INSERT INTO costs (created_at, item, amount, kind, period, note) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            [(now, *row) for row in _COST_SEED],
+        )
+        _set_meta(conn, "costs_seeded", "1")
+
+
+def _has_meta(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+    return True
+
+
+def _set_meta(conn, k, v):
+    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (k, v))
+
+
+def add_cost(item, amount, kind, period, note=""):
+    import datetime as _dt
+    with get_conn() as conn:
+        _ensure_costs(conn)
+        conn.execute(
+            "INSERT INTO costs (created_at, item, amount, kind, period, note) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (_dt.datetime.now().strftime("%Y-%m-%d"), item, amount, kind, period, note),
+        )
+
+
+def get_costs():
+    with get_conn() as conn:
+        _ensure_costs(conn)
+        return [dict(r) for r in conn.execute("SELECT * FROM costs ORDER BY kind, id")]
+
+
+def delete_cost(cost_id):
+    with get_conn() as conn:
+        _ensure_costs(conn)
+        conn.execute("DELETE FROM costs WHERE id = ?", (cost_id,))
+
+
 # ---------- Gixen 등록 체크(새로고침/재시작에도 유지) ----------
 def _ensure_gixen(conn):
     conn.execute("CREATE TABLE IF NOT EXISTS gixen_marks (item_id TEXT PRIMARY KEY, at TEXT)")
