@@ -60,6 +60,11 @@ _PPT_NOISE = re.compile(
 )
 
 
+_PPT_ABBR = {
+    "mltrs": "moltres", "zpds": "zapdos", "artcn": "articuno",  # Hidden Fates 태그팀 약어
+}
+
+
 def _ppt_query(text):
     """PPT 검색용 깔끔한 문자열 (긴 제목에서 카드 이름만 추출)."""
     t = text or ""
@@ -68,6 +73,9 @@ def _ppt_query(text):
     t = re.sub(r"\d+\s*/\s*\d+", " ", t)   # 215/203 같은 번호 제거
     t = re.sub(r"#\s*\w+", " ", t)         # #125, #SV49 제거
     t = re.sub(r"[^A-Za-z0-9 ]", " ", t)
+    # 셀러 약어 → 정식 카드명 (PPT가 못 읽는 줄임말 복원)
+    t = re.sub(r"[A-Za-z]+",
+               lambda m: _PPT_ABBR.get(m.group(0).lower(), m.group(0)), t)
     t = re.sub(r"\b\w*\d\w*\b", " ", t)    # 숫자가 든 토큰 전부 제거(133554679, swsh11, 2023 등)
     t = _PPT_NOISE.sub(" ", t)
     t = re.sub(r"\s+", " ", t).strip()

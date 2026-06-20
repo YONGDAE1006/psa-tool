@@ -36,11 +36,15 @@ def run():
     alert_rows = []   # 목록엔 안 넣지만 너무 좋아서 알림만 보낼 위험(하락) 매물
     skipped = {"country": 0, "shipping": 0, "currency": 0, "foreign": 0, "budget": 0,
                "keyword": 0, "lowvalue": 0, "lowprofit": 0, "bids": 0, "risky": 0,
-               "seller": 0}
+               "seller": 0, "excluded": 0}
+    _excluded = db.get_excluded()        # 사용자가 '제외'한 매물 — 다시 안 긁어옴
     for it in listings:
         title = it["title"]
         # PSA 10 매물만 (제목에 PSA 10 표기가 있는 것)
         if not has_psa10(title):
+            continue
+        if it.get("item_id") in _excluded:
+            skipped["excluded"] += 1
             continue
 
         # --- 싼 필터 (시세 조회 전에 적용 → 크레딧 절약) ---

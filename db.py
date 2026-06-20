@@ -337,3 +337,36 @@ def set_gixen_mark(item_id, on=True):
                          (item_id, _dt.datetime.now(_dt.timezone.utc).isoformat()))
         else:
             conn.execute("DELETE FROM gixen_marks WHERE item_id = ?", (item_id,))
+
+
+def _ensure_excluded(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS excluded_items "
+                 "(item_id TEXT PRIMARY KEY, title TEXT, at TEXT)")
+
+
+def get_excluded():
+    """제외(블랙리스트) 처리된 item_id 집합."""
+    with get_conn() as conn:
+        _ensure_excluded(conn)
+        return {row["item_id"] for row in conn.execute("SELECT item_id FROM excluded_items")}
+
+
+def get_excluded_list():
+    """제외 목록 (item_id, title) — 복원 UI용. 최근 제외 순."""
+    with get_conn() as conn:
+        _ensure_excluded(conn)
+        return [(row["item_id"], row["title"])
+                for row in conn.execute(
+                    "SELECT item_id, title FROM excluded_items ORDER BY at DESC")]
+
+
+def set_excluded(item_id, title="", on=True):
+    import datetime as _dt
+    with get_conn() as conn:
+        _ensure_excluded(conn)
+        if on:
+            conn.execute("INSERT OR REPLACE INTO excluded_items (item_id, title, at) "
+                         "VALUES (?, ?, ?)",
+                         (item_id, title, _dt.datetime.now(_dt.timezone.utc).isoformat()))
+        else:
+            conn.execute("DELETE FROM excluded_items WHERE item_id = ?", (item_id,))

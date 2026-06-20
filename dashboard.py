@@ -24,6 +24,16 @@ def _toggle_gixen(item_id):
     """Gixen 등록 체크 토글 → DB 저장(영구 유지)."""
     db.set_gixen_mark(item_id, bool(st.session_state.get(f"gx_{item_id}", False)))
 
+
+def _exclude_item(item_id, title=""):
+    """이 매물 제외 → DB 저장. 다음 수집 때도 다시 안 긁어옴."""
+    db.set_excluded(item_id, title, True)
+
+
+def _restore_item(item_id):
+    """제외 해제."""
+    db.set_excluded(item_id, on=False)
+
 st.set_page_config(page_title="Pokemon PSA10 비딩 대시보드", layout="wide")
 
 
@@ -234,9 +244,17 @@ with tab1:
     if only_good:
         view = view[view["후보"]]
     _gx_marks = db.get_gixen_marks()   # Gixen 등록 체크(영구 저장)
+    _excluded = db.get_excluded()      # 제외(블랙리스트) — 화면+다음수집에서 빠짐
+    view = view[~view["item_id"].isin(_excluded)]
     # (입찰여지 필터 제거 — 시세/ROI는 사용자가 직접 판단. 입찰 N건 이상 활성 매물 모두 표시)
     if _gx_marks and st.checkbox(f"☑️ Gixen 등록한 {len(_gx_marks)}건 숨기기 (남은 것만 보기)"):
         view = view[~view["item_id"].isin(_gx_marks)]
+    if _excluded:
+        with st.expander(f"🚫 제외한 매물 {len(_excluded)}건 (복원 가능)"):
+            for _eid, _et in db.get_excluded_list():
+                _c1, _c2 = st.columns([8, 1])
+                _c1.caption(_et or _eid)
+                _c2.button("복원", key=f"rs_{_eid}", on_click=_restore_item, args=(_eid,))
 
     _sortby = st.radio("정렬", ["종료임박순", "ROI순", "예상수익순"],
                        horizontal=True, label_visibility="collapsed")
@@ -285,9 +303,13 @@ with tab1:
                     f"신호 **{lbl}**  ·  👤 셀러 **{_sname}** "
                     f"(리뷰 {_sfb} · {_spct:.0f}%){_swarn}  "
                     "·  📷 왼쪽 두 이미지(실물/공식)가 같은 카드인지 확인하세요")
-                st.toggle("⏱ Gixen 등록 완료 (켜두면 새로고침해도 유지)",
-                          value=(r["item_id"] in _gx_marks), key=f"gx_{r['item_id']}",
-                          on_change=_toggle_gixen, args=(r["item_id"],))
+                _tg, _ex = st.columns([5, 2])
+                _tg.toggle("⏱ Gixen 등록 완료 (켜두면 새로고침해도 유지)",
+                           value=(r["item_id"] in _gx_marks), key=f"gx_{r['item_id']}",
+                           on_change=_toggle_gixen, args=(r["item_id"],))
+                _ex.button("🚫 제외", key=f"ex_{r['item_id']}",
+                           help="입찰가치 없음 → 목록에서 빼고 다음 수집에도 안 나옴",
+                           on_click=_exclude_item, args=(r["item_id"], r["title"]))
 
             m = st.columns(4)
             m[0].metric("현재가", _money(r["current_bid"]))
