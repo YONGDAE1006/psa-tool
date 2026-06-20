@@ -161,6 +161,7 @@ if st.sidebar.button("🔄 데이터 새로고침 (eBay 다시 수집)"):
     with st.spinner("eBay 수집 + 시세 매칭 중..."):
         import collector
         try:
+            db.clear_failed_sold_cache()   # 매칭 실패캐시 비워 개선된 매칭 즉시 반영
             n = collector.run()
             st.sidebar.success(f"{n}개 매물 수집 완료")
         except Exception as e:

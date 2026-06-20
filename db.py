@@ -153,6 +153,17 @@ def save_sold_cache(query, data):
         )
 
 
+def clear_failed_sold_cache():
+    """매칭 실패(가격·이미지 둘 다 없음) 캐시만 삭제 → 다음 수집때 재매칭 시도.
+    매칭 로직/수동시세 개선이 24h 실패캐시에 막혀 반영 안 되던 문제 해소.
+    (가격·이미지가 있는 정상 캐시는 보존 → 크레딧 절약 유지.) 삭제건수 반환."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM sold_cache WHERE (n IS NULL OR n = 0) "
+            "AND (card_image IS NULL OR card_image = '')")
+        return cur.rowcount
+
+
 def get_id_cache(key):
     """카드 식별자(tcgPlayerId) 영구 캐시 조회. 한 번 찾으면 검색 크레딧 절약."""
     with get_conn() as conn:
