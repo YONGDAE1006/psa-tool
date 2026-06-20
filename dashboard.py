@@ -322,7 +322,7 @@ with tab1:
             # 수동 시세(PriceCharting 등) 적용: PPT 시세 없을 때 카드별 수동값으로 보강
             _ck = collector._card_key(r.get("title"), r.get("matched_name"))
             _manual = _manual_prices.get(_ck)
-            if _manual and not pd.notna(r.get("market_value")):
+            if _manual:        # 수동 입력값은 PPT보다 우선(사용자가 직접 신뢰값 넣은 것)
                 _mv = valuation.evaluate(r.get("current_bid") or 0, r.get("shipping") or 0, _manual)
                 r["market_value"], r["max_bid"] = _manual, _mv["max_bid"]
                 r["profit"], r["breakeven_bid"] = _mv["profit"], _mv["breakeven_bid"]
