@@ -41,7 +41,7 @@ def set_budget(n):
 # PPT 검색을 방해하는 단어/표기 제거 (등급·마케팅·별명 등)
 _PPT_NOISE = re.compile(
     r"\b(psa|bgs|cgc|sgc|gem|mint|mt|graded|grade|holo|holographic|reverse|rare|"
-    r"secret|alt|alternate|art|full|sir|sar|shiny|promo|promos|japanese|english|jpn|en|"
+    r"secret|alt|alternate|art|full|sir|sar|sr|shiny|promo|promos|japanese|english|jpn|en|"
     r"moonbreon|wotc|card|cards|tcg|pokemon|pokémon|lot|nm|near|condition|regular|"
     r"potential|hyper|ultra|pt|swirl|with|new|other|read|desc|foil|"
     r"the|company|official|genuine|authentic|vintage|seller|edition|set|"
@@ -53,7 +53,7 @@ _PPT_NOISE = re.compile(
     r"sword|shield|sun|moon|scarlet|violet|fates|hidden|paldean|paldea|twilight|masquerade|"
     r"obsidian|flames|surging|sparks|destined|rivals|phantasmal|ascended|heroes|white|flare|"
     r"fusion|strike|silver|tempest|crown|zenith|chilling|reign|celebrations|cosmic|eclipse|"
-    r"unified|minds|champions|path|temporal|forces|prismatic|evolutions|partner|first|"
+    r"unified|minds|champions|champion|path|temporal|forces|prismatic|evolutions|partner|first|"
     # 세트 코드(3~4글자)
     r"mep|twm|svp|dri|pfl|meg|asc|obf|paf|ssp|wht|pal|tef|sfa|swsh|hgss)\b",
     re.I,
@@ -64,6 +64,33 @@ _PPT_ABBR = {
     "mltrs": "moltres", "zpds": "zapdos", "artcn": "articuno",  # Hidden Fates 태그팀 약어
     "vm": "vmax",   # 셀러가 VMAX를 'VM'으로 줄여쓰는 경우
 }
+
+
+# 세트명 단어(번호검색 실패시 세트명으로 재검색하는 4차 폴백용).
+# (에라 단어 sword/shield/sun/moon/scarlet/violet는 너무 흔해 set_hint 오염 → 제외.
+#  특정 세트명만 둠.)
+_SET_WORDS = frozenset(
+    "fates hidden paldean paldea twilight "
+    "masquerade obsidian flames surging sparks destined rivals phantasmal ascended "
+    "heroes flare fusion strike silver tempest crown zenith chilling reign "
+    "celebrations cosmic eclipse unified minds champions champion path temporal "
+    "forces prismatic evolutions evolving skies vivid voltage battle styles "
+    "brilliant stars astral radiance lost origin paradox stellar journey "
+    "shrouded fable plasma generations boundaries crossing ancient roaring "
+    "clash rebel darkness incandescent".split()
+)
+
+
+def _set_hint(title):
+    """제목에서 세트명 단어만 추출(번호로 못 찾는 카드를 세트명으로 재검색하기 위함)."""
+    t = unicodedata.normalize("NFKD", title or "").encode("ascii", "ignore").decode().lower()
+    t = re.sub(r"[’‘'`]s\b", "", t)
+    seen, out = set(), []
+    for w in re.findall(r"[a-z]+", t):
+        if w in _SET_WORDS and w not in seen:
+            seen.add(w)
+            out.append(w)
+    return " ".join(out)
 
 
 def _ppt_query(text):
@@ -386,6 +413,20 @@ def _ppt_resolve_id(name, card_number, base, title=""):
             if m3:                                # 'Crobat ex 234', 'Raticate 202' 등에서 매칭
                 best, matched = b3, True
                 break
+
+    # 4차 폴백: 번호검색이 0건인 카드(PPT가 번호 아닌 세트명으로만 찾아줌 — Champion's Path
+    #          #074, Paldean Fates #191, Hidden Fates SV59, Crown Zenith GG12 등) → 제목의
+    #          세트명 단서로 재검색. 앞 era코드(SM/SWSH)도 떼며 시도. 번호일치 필수라 안전.
+    if qn and not matched:
+        sh = _set_hint(title)
+        if sh:
+            toks = name.split()
+            for i in range(0, max(1, len(toks))):     # 앞 토큰 0개부터 떼며
+                core = " ".join(toks[i:])
+                b4, m4 = pick(fetch(f"{core} {sh}".strip(), 8))
+                if m4:
+                    best, matched = b4, True
+                    break
 
     # 제목에 번호가 있는데 끝내 일치 못 찾으면 = 엉뚱한 카드 위험 → 포기(오매칭 방지)
     if qn and not matched:
