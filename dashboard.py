@@ -178,13 +178,19 @@ def _fresh(updated):
     return f"{d}일 전" + (" ⚠️오래됨" if d > config.STALE_DAYS else "")
 
 
-# 요약 메트릭
+# 요약 메트릭 — 아래 카드에 실제 표시되는 것(입찰 여지 있는 것 + Gixen 등록)과 일치.
+_marks_m = db.get_gixen_marks()
+_shown_mask = (
+    (df["max_bid"].notna() & (df["current_bid"] < df["max_bid"]))
+    | df["item_id"].isin(_marks_m)
+)
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("표시 매물", len(df))
-c2.metric("비딩 후보", int(df["후보"].sum()))
+c1.metric("표시 후보", int(_shown_mask.sum()),
+          help="아래 카드에 보이는 입찰 가능 후보. 현재가≥권장입찰('이미 비싼')은 제외돼 수집매물보다 적을 수 있음")
+c2.metric("비딩 후보(신뢰)", int(df["후보"].sum()))
 c3.metric("실낙찰가 확보", int((df["value_source"] == "sold").sum()))
-c4.metric("종료 임박(1시간 내)",
-          int(((df["secs_left"] > 0) & (df["secs_left"] <= 3600)).sum()))
+c4.metric("종료 임박(1h)",
+          int((_shown_mask & (df["secs_left"] > 0) & (df["secs_left"] <= 3600)).sum()))
 
 if config.MODE == "demo":
     st.info("지금은 **DEMO 모드** (가짜 eBay 매물 + 샘플 시세). 전체 흐름 확인용입니다.")
