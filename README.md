@@ -1,3 +1,17 @@
+# psa-tool — PSA-graded trading card auction price analyzer
+
+A personal, single-user tool that helps evaluate **PSA-graded trading card auctions** on eBay before bidding.
+
+**eBay APIs used:**
+- **Browse API** (`buy.browse`) — fetches live graded-card auctions, sorted by ending-soonest, filtered to US location and auction format (in production).
+- **Marketplace Insights API** (`buy.marketplace.insights`) — *access requested* — recent sold prices (last 90 days) per graded card, used to compute an accurate market value (median + price range) and a short-term price trend. A single current price is not enough to judge whether an auction is priced below or above the going rate.
+
+Data is used only internally within this application for price analysis. It is never redistributed, resold, or shown publicly. API keys live in a local `.env` file that is **not** committed to this repository.
+
+---
+
+*(아래는 한국어 상세 문서 / Korean detailed documentation below)*
+
 # Pokemon PSA 10 비딩 대시보드
 
 eBay에서 "pokemon psa 10" 경매를 **종료 임박순**으로 수집하고,
