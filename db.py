@@ -407,3 +407,41 @@ def get_own_price(card_key, days=365):
     n = len(prices)
     median = prices[n // 2] if n % 2 else (prices[n // 2 - 1] + prices[n // 2]) / 2
     return {"median": round(median, 2), "min": prices[0], "max": prices[-1], "n": n}
+
+
+def _ensure_manual(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS manual_prices ("
+                 "card_key TEXT PRIMARY KEY, price REAL, note TEXT, updated_at TEXT)")
+
+
+def get_manual_price(card_key):
+    if not card_key:
+        return None
+    with get_conn() as conn:
+        _ensure_manual(conn)
+        r = conn.execute("SELECT price FROM manual_prices WHERE card_key = ?",
+                         (card_key,)).fetchone()
+    return r["price"] if r and r["price"] else None
+
+
+def get_all_manual_prices():
+    with get_conn() as conn:
+        _ensure_manual(conn)
+        return {r["card_key"]: r["price"]
+                for r in conn.execute("SELECT card_key, price FROM manual_prices")}
+
+
+def set_manual_price(card_key, price, note=""):
+    """카드별 수동 시세(PriceCharting 등). price>0 저장, 아니면 삭제. card_key 기준이라 같은 카드 모든 매물에 적용."""
+    import datetime as _dt
+    if not card_key:
+        return
+    with get_conn() as conn:
+        _ensure_manual(conn)
+        if price and float(price) > 0:
+            conn.execute("INSERT OR REPLACE INTO manual_prices (card_key, price, note, updated_at) "
+                         "VALUES (?, ?, ?, ?)",
+                         (card_key, float(price), note,
+                          _dt.datetime.now(_dt.timezone.utc).isoformat()))
+        else:
+            conn.execute("DELETE FROM manual_prices WHERE card_key = ?", (card_key,))

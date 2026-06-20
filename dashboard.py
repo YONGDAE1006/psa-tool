@@ -14,6 +14,7 @@ import collector
 import config
 import db
 import links
+import valuation
 
 
 def _upscale_img(url):
@@ -34,6 +35,11 @@ def _exclude_item(item_id, title=""):
 def _restore_item(item_id):
     """제외 해제."""
     db.set_excluded(item_id, on=False)
+
+
+def _save_manual(card_key, widget_key):
+    """수동 시세 입력 저장(카드별). 0이면 삭제."""
+    db.set_manual_price(card_key, st.session_state.get(widget_key, 0) or 0)
 
 st.set_page_config(page_title="Pokemon PSA10 비딩 대시보드", layout="wide")
 
@@ -277,6 +283,7 @@ with tab1:
     _BADGE = {"🟢 후보": ("🟢", "후보"), "🔥 스틸": ("🔥", "스틸"),
               "⚠️ 저신뢰": ("⚠️", "저신뢰·표본부족")}
 
+    _manual_prices = db.get_all_manual_prices()   # 카드별 수동시세(한 번에 로드)
     for _, r in view.iterrows():
         ic, lbl = _BADGE.get(r["신호"], ("•", "관망"))
         with st.container(border=True):
@@ -312,10 +319,21 @@ with tab1:
                            help="입찰가치 없음 → 목록에서 빼고 다음 수집에도 안 나옴",
                            on_click=_exclude_item, args=(r["item_id"], r["title"]))
 
+            # 수동 시세(PriceCharting 등) 적용: PPT 시세 없을 때 카드별 수동값으로 보강
+            _ck = collector._card_key(r.get("title"), r.get("matched_name"))
+            _manual = _manual_prices.get(_ck)
+            if _manual and not pd.notna(r.get("market_value")):
+                _mv = valuation.evaluate(r.get("current_bid") or 0, r.get("shipping") or 0, _manual)
+                r["market_value"], r["max_bid"] = _manual, _mv["max_bid"]
+                r["profit"], r["breakeven_bid"] = _mv["profit"], _mv["breakeven_bid"]
+                r["ROI%"] = (_mv["roi"] * 100) if _mv["roi"] is not None else None
+                r["value_source"] = "manual"
+
             m = st.columns(4)
             m[0].metric("현재가", _money(r["current_bid"]))
             m[1].metric("시세", _money(r["market_value"]),
-                        help=f"실낙찰 표본 {int(r['sold_n']) if pd.notna(r.get('sold_n')) else 0}건")
+                        help=("✋ 수동 입력(PriceCharting)" if r.get("value_source") == "manual"
+                              else f"실낙찰 표본 {int(r['sold_n']) if pd.notna(r.get('sold_n')) else 0}건"))
             m[2].metric("권장 최대입찰", _money(r["max_bid"]))
             m[3].metric("예상수익", _money(r["profit"]),
                         help=(f"ROI {r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else None))
@@ -332,11 +350,16 @@ with tab1:
                     and r["market_value"] > r["current_bid"] * 4):
                 st.caption("⚠️ **시세가 현재가의 4배+** — 진짜 스틸일 수도 있지만, 같은 번호 다른 세트로 "
                            "잘못 매칭됐을 가능성도 큽니다. 위 두 이미지와 **'시세기준' 세트명**을 꼭 확인하세요.")
-            _own = db.get_own_price(collector._card_key(r.get("title"), r.get("matched_name")))
+            _own = db.get_own_price(_ck)
             if _own:
                 st.caption(f"📈 **자체 낙찰이력**: 중앙값 **${_own['median']:.0f}** "
                            f"(범위 ${_own['min']:.0f}~${_own['max']:.0f} · {_own['n']}건, 최근 1년) "
                            f"— 우리가 직접 관측한 실제 종료가")
+            _mp_key = f"mp_{r['item_id']}"
+            st.number_input(
+                "✏️ 수동 시세 입력 ($, PriceCharting PSA10 값) — 이 카드의 모든 매물에 적용. 0=해제",
+                min_value=0.0, value=float(_manual or 0), step=1.0, key=_mp_key,
+                on_change=_save_manual, args=(_ck, _mp_key))
 
             _num = links.ebay_item_number(r.get("url"), r.get("item_id"))
             c1, c2, c3, c4 = st.columns([2, 2, 2, 3])
