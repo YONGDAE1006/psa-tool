@@ -156,12 +156,8 @@ if st.sidebar.button("🔄 데이터 새로고침 (eBay 다시 수집)"):
 # ---------------- 본문 ----------------
 st.title("🃏 Pokemon PSA 10 — 종료임박 비딩 대시보드")
 _loc = config.ITEM_LOCATION_COUNTRY or "전체"
-_vp = (f"시세 **${config.MIN_MARKET_VALUE:.0f}+** · 예상수익 **${config.MIN_PROFIT:.0f}+** · "
-       if (config.MIN_MARKET_VALUE > 0 or config.MIN_PROFIT > 0)
-       else "시세·ROI **직접 판단**(필터 없음) · ")
-st.caption(f"적용 조건: 소재지 **{_loc}** · 배송비 **${config.MAX_SHIPPING:.0f} 미만** · "
-           f"현재가 **${config.MAX_BID:.0f} 이하** · {_vp}"
-           f"입찰 **{config.MIN_BID_COUNT}건 이상** · 영어판만 · 경매(종료임박순) — 조건은 `.env`에서 조정")
+st.caption(f"입찰 {config.MIN_BID_COUNT}건+ · 배송 ${config.MAX_SHIPPING:.0f} 이하 · "
+           f"예산 ${config.MAX_BID:.0f} · 영어판 · 종료임박순")
 
 rows = db.get_listings()
 if not rows:
@@ -297,8 +293,7 @@ try:
         _stale_collect = " ⚠️ 2시간+ 미수집 (자동수집 켜졌는지 확인)"
 except ValueError:
     pass
-st.caption(f"🕒 마지막 수집: **{_ago(_last)}**{_stale_collect}  ·  최신화는 사이드바 **새로고침** 또는 F5")
-st.caption("⚠️ 경매는 막판에 가격이 뛸 수 있습니다(스나이핑). ROI는 '기회 신호'이지 확정 수익이 아닙니다.")
+st.caption(f"🕒 마지막 수집 {_ago(_last)}{_stale_collect}")
 
 tab1, tab2, tab3, tab4 = st.tabs(["🎯 비딩 후보", "🔥 인기·거래량", "📒 거래 기록", "📝 입찰 기록"])
 
@@ -327,10 +322,7 @@ with tab1:
     elif _sortby == "예상수익순":
         view = view.sort_values("profit", ascending=False, na_position="last")
 
-    st.caption(
-        f"📡 종료임박 경매(약 10~15시간 내 종료분)에서 추린 후보 **{len(view)}건**. "
-        "조기경매는 종료 직전 가격이 오르니 **권장 최대입찰가**까지만 Gixen에 걸어두세요."
-    )
+    st.caption(f"후보 {len(view)}건 · 권장 최대입찰가까지만 Gixen에 걸어두세요")
     if view.empty:
         st.info("지금 조건에 맞는 후보가 없습니다. (PSA10 차익 기회는 원래 드물어요)")
 
@@ -347,39 +339,26 @@ with tab1:
             top = st.columns([1, 1, 5])
             _eimg, _cimg = r.get("image"), r.get("card_image")
             if pd.notna(_eimg) and _eimg:
-                top[0].image(_upscale_img(_eimg), caption="실물(판매자)",
-                             use_container_width=True)
+                top[0].image(_upscale_img(_eimg), caption="실물", use_container_width=True)
             if pd.notna(_cimg) and _cimg:
-                top[1].image(_cimg, caption="공식(시세기준)",
-                             use_container_width=True)
+                top[1].image(_cimg, caption="공식", use_container_width=True)
             with top[2]:
                 hc = st.columns([8, 2])
                 _done = "✅ " if r["item_id"] in _gx_marks else ""
                 hc[0].markdown(f"#### {ic} {_done}{r['title']}")
                 hc[1].markdown(
-                    f"<div style='text-align:right;padding-top:10px;color:#888'>⏳ <b>{r['남은시간']}</b></div>",
+                    f"<div style='text-align:right;padding-top:8px;color:#94a3b8;font-weight:700'>⏳ {r['남은시간']}</div>",
                     unsafe_allow_html=True)
                 _sfb = int(r["seller_feedback"]) if pd.notna(r.get("seller_feedback")) else 0
                 _sname = r["seller_name"] if pd.notna(r.get("seller_name")) else "-"
-                _spct = r["seller_pct"] if pd.notna(r.get("seller_pct")) else 0
-                _swarn = ("  ·  ⚠️ **신규/저평판 셀러 — 사기(가짜슬랩·미발송) 주의**"
+                _swarn = ("  ·  ⚠️ 신규/저평판 셀러 주의"
                           if _sfb < config.SELLER_FLAG_FEEDBACK else "")
-                st.caption(
-                    f"신호 **{lbl}**  ·  👤 셀러 **{_sname}** "
-                    f"(리뷰 {_sfb} · {_spct:.0f}%){_swarn}  "
-                    "·  📷 왼쪽 두 이미지(실물/공식)가 같은 카드인지 확인하세요")
-                _tg, _ex = st.columns([5, 2])
-                _tg.toggle("⏱ Gixen 등록 완료 (켜두면 새로고침해도 유지)",
-                           value=(r["item_id"] in _gx_marks), key=f"gx_{r['item_id']}",
-                           on_change=_toggle_gixen, args=(r["item_id"],))
-                _ex.button("🚫 제외", key=f"ex_{r['item_id']}",
-                           help="입찰가치 없음 → 목록에서 빼고 다음 수집에도 안 나옴",
-                           on_click=_exclude_item, args=(r["item_id"], r["title"]))
+                st.caption(f"👤 {_sname} · 리뷰 {_sfb}{_swarn}")
 
-            # 수동 시세(PriceCharting 등) 적용: PPT 시세 없을 때 카드별 수동값으로 보강
+            # 수동 시세(PriceCharting) 적용 — PPT보다 우선
             _ck = collector._card_key(r.get("title"), r.get("matched_name"))
             _manual = _manual_prices.get(_ck)
-            if _manual:        # 수동 입력값은 PPT보다 우선(사용자가 직접 신뢰값 넣은 것)
+            if _manual:
                 _mv = valuation.evaluate(r.get("current_bid") or 0, r.get("shipping") or 0, _manual)
                 r["market_value"], r["max_bid"] = _manual, _mv["max_bid"]
                 r["profit"], r["breakeven_bid"] = _mv["profit"], _mv["breakeven_bid"]
@@ -389,51 +368,39 @@ with tab1:
             m = st.columns(4)
             m[0].metric("현재가", _money(r["current_bid"]))
             m[1].metric("시세", _money(r["market_value"]),
-                        help=("✋ 수동 입력(PriceCharting)" if r.get("value_source") == "manual"
+                        help=("수동(PriceCharting)" if r.get("value_source") == "manual"
                               else f"실낙찰 표본 {int(r['sold_n']) if pd.notna(r.get('sold_n')) else 0}건"))
             m[2].metric("권장 최대입찰", _money(r["max_bid"]))
             m[3].metric("예상수익", _money(r["profit"]),
                         help=(f"ROI {r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else None))
 
-            _roi = f"**ROI {r['ROI%']:.0f}%**  ·  " if pd.notna(r.get("ROI%")) else ""
-            _sn = int(r["sold_n"]) if pd.notna(r.get("sold_n")) else 0
             _mn = r["matched_name"] if pd.notna(r.get("matched_name")) else "-"
-            _tr = r["추세"] if isinstance(r.get("추세"), str) else ""
-            st.markdown(
-                f"{_roi}**배송 {_money(r['shipping'], 2)}**  ·  역대 {_money(r['all_time_value'])}"
-                f"  ·  표본 {_sn}건  ·  손익분기 {_money(r['breakeven_bid'])}"
-                f"  ·  {_tr}  ·  🔗 시세기준: **{_mn}**")
+            st.caption(f"손익분기 {_money(r['breakeven_bid'])} · 시세기준 {_mn}")
             if (pd.notna(r.get("market_value")) and r.get("current_bid")
                     and r["market_value"] > r["current_bid"] * 4):
-                st.caption("⚠️ **시세가 현재가의 4배+** — 진짜 스틸일 수도 있지만, 같은 번호 다른 세트로 "
-                           "잘못 매칭됐을 가능성도 큽니다. 위 두 이미지와 **'시세기준' 세트명**을 꼭 확인하세요.")
+                st.caption("⚠️ 시세가 현재가 4배+ — 오매칭 의심, 이미지·세트 확인")
             _own = db.get_own_price(_ck)
             if _own:
-                st.caption(f"📈 **자체 낙찰이력**: 중앙값 **${_own['median']:.0f}** "
-                           f"(범위 ${_own['min']:.0f}~${_own['max']:.0f} · {_own['n']}건, 최근 1년) "
-                           f"— 우리가 직접 관측한 실제 종료가")
-            _mp_key = f"mp_{r['item_id']}"
-            st.number_input(
-                "✏️ 수동 시세 입력 ($, PriceCharting PSA10 값) — 이 카드의 모든 매물에 적용. 0=해제",
-                min_value=0.0, value=float(_manual or 0), step=1.0, key=_mp_key,
-                on_change=_save_manual, args=(_ck, _mp_key))
+                st.caption(f"📈 자체 낙찰 중앙 ${_own['median']:.0f} (${_own['min']:.0f}~${_own['max']:.0f} · {_own['n']}건)")
 
-            _num = links.ebay_item_number(r.get("url"), r.get("item_id"))
-            c1, c2, c3, c4 = st.columns([2, 2, 2, 3])
+            cc = st.columns([2, 2, 2, 2, 3])
+            cc[0].toggle("Gixen", value=(r["item_id"] in _gx_marks), key=f"gx_{r['item_id']}",
+                         on_change=_toggle_gixen, args=(r["item_id"],))
             if r.get("url"):
-                c1.link_button("🟢 eBay", r["url"], use_container_width=True)
-            c2.link_button("⏱ Gixen", links.gixen_url(), use_container_width=True)
-            c3.link_button(
-                "📊 시세검증",
+                cc[1].link_button("eBay", r["url"], use_container_width=True)
+            cc[2].link_button("시세검증",
                 links.pricecharting_url(links.verify_query(r.get("matched_name"), r.get("title"))),
                 use_container_width=True)
-            _mb = c4.number_input(
+            cc[3].button("🚫 제외", key=f"ex_{r['item_id']}", use_container_width=True,
+                         on_click=_exclude_item, args=(r["item_id"], r["title"]))
+            cc[4].number_input(
                 "내 최대입찰가($)", min_value=0.0, step=1.0,
                 value=float(round(r["max_bid"], 2)) if pd.notna(r.get("max_bid")) else 0.0,
                 key=f"bid_{r['item_id']}")
-            st.markdown(
-                f"📋 Gixen 붙여넣기 → eBay번호 `{_num or '?'}` · 최대입찰 `${_mb:.2f}` "
-                "— 위 칸에서 직접 조절(얇은 카드는 시세검증 보고)")
+            _mp_key = f"mp_{r['item_id']}"
+            st.number_input("✏️ 수동 시세($) — 이 카드 전체 적용, 0=해제",
+                min_value=0.0, value=float(_manual or 0), step=1.0, key=_mp_key,
+                on_change=_save_manual, args=(_ck, _mp_key))
 
     st.markdown(
         f"🔎 추가 검증 도구: [130point]({links.point130_url()}) · "
