@@ -31,6 +31,14 @@ def extract_card_number(text: str):
     m = re.search(r"#\s*([a-z]{0,3}\d{1,4})", t)
     if m:
         return m.group(1)
+    # 프로모 코드 (# 없이 적힌 SWSH291, SM248, SVP083, GG12 등)
+    m = re.search(r"\b(swsh|svp|swhp|sm|sv|xy|bw|hgss|gg|tg)\s*(\d{2,4})\b", t)
+    if m:
+        return m.group(1) + m.group(2)
+    # 맨숫자 카드번호 — 앞0 붙은 건 거의 카드번호(023/050/009). 연도·총수량 오인 방지로 앞0만.
+    m = re.search(r"\b(0\d{1,3})\b", t)
+    if m:
+        return m.group(1)
     return None
 
 

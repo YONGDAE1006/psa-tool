@@ -41,10 +41,21 @@ def set_budget(n):
 # PPT 검색을 방해하는 단어/표기 제거 (등급·마케팅·별명 등)
 _PPT_NOISE = re.compile(
     r"\b(psa|bgs|cgc|sgc|gem|mint|mt|graded|grade|holo|holographic|reverse|rare|"
-    r"secret|alt|alternate|art|full|sir|sar|shiny|promo|japanese|english|jpn|en|"
+    r"secret|alt|alternate|art|full|sir|sar|shiny|promo|promos|japanese|english|jpn|en|"
     r"moonbreon|wotc|card|cards|tcg|pokemon|pokémon|lot|nm|near|condition|regular|"
     r"potential|hyper|ultra|pt|swirl|with|new|other|read|desc|foil|"
-    r"the|company|official|genuine|authentic|vintage|seller|edition|set)\b",
+    r"the|company|official|genuine|authentic|vintage|seller|edition|set|"
+    # 희귀도/상품/프로모 노이즈
+    r"illustration|collection|premium|classic|special|black|star|box|elite|trainer|"
+    r"returns|anniversary|birthday|sale|hour|version|non|playing|ace|clubs|evolved|evolving|"
+    r"preorder|pre|order|shirt|batik|berkemeja|skies|roaring|rebel|clash|chaos|rising|"
+    # 세트 이름(번호로 식별되므로 세트명은 노이즈 처리)
+    r"sword|shield|sun|moon|scarlet|violet|fates|hidden|paldean|paldea|twilight|masquerade|"
+    r"obsidian|flames|surging|sparks|destined|rivals|phantasmal|ascended|heroes|white|flare|"
+    r"fusion|strike|silver|tempest|crown|zenith|chilling|reign|celebrations|cosmic|eclipse|"
+    r"unified|minds|champions|path|temporal|forces|prismatic|evolutions|partner|first|"
+    # 세트 코드(3~4글자)
+    r"mep|twm|svp|dri|pfl|meg|asc|obf|paf|ssp|wht|pal|tef|sfa|swsh|hgss)\b",
     re.I,
 )
 
