@@ -10,6 +10,7 @@ import re
 import pandas as pd
 import streamlit as st
 
+import collector
 import config
 import db
 import links
@@ -331,6 +332,11 @@ with tab1:
                     and r["market_value"] > r["current_bid"] * 4):
                 st.caption("⚠️ **시세가 현재가의 4배+** — 진짜 스틸일 수도 있지만, 같은 번호 다른 세트로 "
                            "잘못 매칭됐을 가능성도 큽니다. 위 두 이미지와 **'시세기준' 세트명**을 꼭 확인하세요.")
+            _own = db.get_own_price(collector._card_key(r.get("title"), r.get("matched_name")))
+            if _own:
+                st.caption(f"📈 **자체 낙찰이력**: 중앙값 **${_own['median']:.0f}** "
+                           f"(범위 ${_own['min']:.0f}~${_own['max']:.0f} · {_own['n']}건, 최근 1년) "
+                           f"— 우리가 직접 관측한 실제 종료가")
 
             _num = links.ebay_item_number(r.get("url"), r.get("item_id"))
             c1, c2, c3, c4 = st.columns([2, 2, 2, 3])

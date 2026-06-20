@@ -370,3 +370,40 @@ def set_excluded(item_id, title="", on=True):
                          (item_id, title, _dt.datetime.now(_dt.timezone.utc).isoformat()))
         else:
             conn.execute("DELETE FROM excluded_items WHERE item_id = ?", (item_id,))
+
+
+def _ensure_sold_log(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS sold_log ("
+                 "item_id TEXT PRIMARY KEY, card_key TEXT, title TEXT, "
+                 "final_price REAL, bid_count INTEGER, ended_at TEXT, recorded_at TEXT)")
+
+
+def record_sold(item_id, card_key, title, final_price, bid_count, ended_at):
+    """종료된 경매의 최종가를 자체 시세이력에 기록(item_id로 중복방지)."""
+    import datetime as _dt
+    with get_conn() as conn:
+        _ensure_sold_log(conn)
+        conn.execute(
+            "INSERT OR IGNORE INTO sold_log "
+            "(item_id, card_key, title, final_price, bid_count, ended_at, recorded_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (item_id, card_key, title, final_price, bid_count, ended_at,
+             _dt.datetime.now(_dt.timezone.utc).isoformat()))
+
+
+def get_own_price(card_key, days=365):
+    """자체 누적 낙찰가 통계(중앙값/범위/건수). 데이터 없으면 None."""
+    import datetime as _dt
+    if not card_key:
+        return None
+    cutoff = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=days)).isoformat()
+    with get_conn() as conn:
+        _ensure_sold_log(conn)
+        prices = sorted(r["final_price"] for r in conn.execute(
+            "SELECT final_price FROM sold_log WHERE card_key = ? AND ended_at >= ? "
+            "AND final_price > 0", (card_key, cutoff)))
+    if not prices:
+        return None
+    n = len(prices)
+    median = prices[n // 2] if n % 2 else (prices[n // 2 - 1] + prices[n // 2]) / 2
+    return {"median": round(median, 2), "min": prices[0], "max": prices[-1], "n": n}

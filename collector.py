@@ -16,11 +16,44 @@ import matcher
 import notify
 import soldprices
 import valuation
-from textutil import has_psa10
+from textutil import has_psa10, extract_card_number
+
+
+def _card_key(title, matched_name=None):
+    """자체 시세이력 묶음 키. 매칭되면 matched_name, 아니면 정규화 이름+번호."""
+    if matched_name:
+        return str(matched_name).strip().lower()
+    name = soldprices._ppt_query(title or "")
+    num = extract_card_number(title or "")
+    key = (name + (f" #{num}" if num else "")).strip().lower()
+    return key or (title or "").strip().lower()
+
+
+def _accumulate_sold_history():
+    """직전 수집 listings 중 '종료된' 매물의 최종가를 자체 시세이력에 누적."""
+    now = dt.datetime.now(dt.timezone.utc)
+    cnt = 0
+    for r in db.get_listings():
+        et = r.get("end_time")
+        if not et or not (r.get("current_bid") or 0) > 0:
+            continue
+        try:
+            ended = dt.datetime.fromisoformat(et.replace("Z", "+00:00")) < now
+        except Exception:
+            ended = False
+        if ended:
+            db.record_sold(r["item_id"], _card_key(r.get("title"), r.get("matched_name")),
+                           r.get("title"), r["current_bid"], r.get("bid_count"), et)
+            cnt += 1
+    return cnt
 
 
 def run():
     db.init_db()
+    # 자체 시세이력 누적: 새 수집이 listings를 지우기 전에, 종료된 매물의 최종가를 기록.
+    _accumulated = _accumulate_sold_history()
+    if _accumulated:
+        print(f"자체 시세이력 누적: 종료매물 {_accumulated}건 기록")
     # 무료 등급 보호: 이번 수집에서 '새로' 조회할 카드 수 제한 (나머지는 캐시 사용)
     soldprices.set_budget(config.SOLD_LOOKUP_LIMIT)
 
