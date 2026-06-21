@@ -48,6 +48,7 @@ _PPT_NOISE = re.compile(
     # 희귀도/상품/프로모 노이즈
     r"illustration|collection|premium|classic|special|black|star|box|elite|trainer|"
     r"returns|anniversary|birthday|sale|hour|version|non|playing|ace|clubs|evolved|evolving|"
+    r"etb|ur|journey|together|leaf|fire|"  # ETB/UR/세트명(Journey Together, FireRed&LeafGreen)
     r"preorder|pre|order|shirt|batik|berkemeja|skies|roaring|rebel|clash|chaos|rising|"
     # 세트 이름(번호로 식별되므로 세트명은 노이즈 처리)
     r"sword|shield|sun|moon|scarlet|violet|fates|hidden|paldean|paldea|twilight|masquerade|"
@@ -427,6 +428,23 @@ def _ppt_resolve_id(name, card_number, base, title=""):
                 if m4:
                     best, matched = b4, True
                     break
+
+    # 5차 폴백: 위 검색이 다 0건/불일치 — 카드명 토큰을 '단독'(번호 없이) 검색하고 번호로 확정.
+    #          'Squirtle 82'는 0건이나 'Squirtle'만 치면 #82가 결과에 떠 잡힘(빈티지/세트노이즈).
+    #          긴 토큰(=고유 포켓몬명 가능성↑)부터, 첫 번호일치에서 멈춤. 번호일치 필수=안전.
+    if qn and not matched:
+        toks = []
+        for tk in name.split():
+            if tk not in toks:
+                toks.append(tk)
+        # 비용 제한: 가장 긴 토큰 2개만(=고유 포켓몬명 가능성 최상). 느려짐 방지.
+        for tok in sorted(toks, key=lambda x: -len(x))[:2]:
+            if len(tok) < 4:
+                continue
+            b5, m5 = pick(fetch(tok, 15))
+            if m5:
+                best, matched = b5, True
+                break
 
     # 제목에 번호가 있는데 끝내 일치 못 찾으면 = 엉뚱한 카드 위험 → 포기(오매칭 방지)
     if qn and not matched:

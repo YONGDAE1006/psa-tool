@@ -1,0 +1,44 @@
+
+검색 'Squirtle' -> 12건
+   Squirtle - SWSH233 #SWSH233 [SWSH: Sword & Shield Promo Cards] tcg=275830
+   Squirtle #96/127 [Platinum] tcg=89495
+   Squirtle - 2006 (Hiroki Yano) #83/112 [World Championship Decks] tcg=477964
+   Squirtle - 083/112 #83/112 [FireRed & LeafGreen] tcg=89490
+   Squirtle - 082/112 #82/112 [FireRed & LeafGreen] tcg=89489
+   Squirtle #68/82 [Team Rocket] tcg=89484
+   Squirtle - 064/100 #64/100 [Crystal Guardians] tcg=89492
+   Squirtle #63/95 [Unleashed] tcg=89496
+   Squirtle - 063/100 #63/100 [Crystal Guardians] tcg=89491
+   Squirtle #46/95 [Team Magma vs Team Aqua] tcg=89488
+
+검색 'Lillie's Clefairy ex' -> 8건
+   Lillie's Clefairy ex - 280/217 #280/217 [ME: Ascended Heroes] tcg=676092
+   Lillie's Clefairy ex - 195 #195 [SV: Scarlet & Violet Promo Cards] tcg=628317
+   Lillie's Clefairy ex - 184/159 #184/159 [SV09: Journey Together] tcg=623611
+   Lillie's Clefairy ex - 173/159 #173/159 [SV09: Journey Together] tcg=623600
+   Lillie's Clefairy ex - 076/217 #076/217 [ME: Ascended Heroes] tcg=675888
+   Lillie's Clefairy ex - 056/159 #056/159 [SV09: Journey Together] tcg=623483
+   Lillie's Clefairy ex - 056/159 #056/159 [Prize Pack Series Cards] tcg=648674
+   Lillie's Clefairy ex - 2025 (Riley McKay) # [World Championship Decks] tcg=689023
+
+검색 'Clefairy ex 173' -> 1건
+   Lillie's Clefairy ex - 173/159 #173/159 [SV09: Journey Together] tcg=623600
+
+검색 'Pikachu Black Star Promo' -> 0건
+
+검색 'Pikachu 027' -> 3건
+   Pikachu - 027/078 (Cosmos Holo) #027/078 [Miscellaneous Cards & Products] tcg=279927
+   Pikachu - 027 #027 [SV: Scarlet & Violet Promo Cards] tcg=500263
+   Pikachu - 027 (Pokemon Center Exclusive) #027 [SV: Scarlet & Violet Promo Cards] tcg=500264
+
+검색 'Eevee Prismatic' -> 6건
+   Eevee ex - 167/131 #167/131 [SV: Prismatic Evolutions] tcg=610522
+   Eevee ex - 075/131 #075/131 [SV: Prismatic Evolutions] tcg=610430
+   Eevee ex - 075/131 (Prismatic Evolutions Stamp) #075/131 [Miscellaneous Cards & Products] tcg=618089
+   Eevee #074/131 [SV: Prismatic Evolutions] tcg=610429
+   Eevee (Master Ball Pattern) #074/131 [SV: Prismatic Evolutions] tcg=610691
+   Eevee (Poke Ball Pattern) #074/131 [SV: Prismatic Evolutions] tcg=610590
+
+검색 'Eevee 173' -> 2건
+   Eevee - 173 #173 [SV: Scarlet & Violet Promo Cards] tcg=610758
+   Eevee - 173 (Pokemon Center Exclusive) #173 [SV: Scarlet & Violet Promo Cards] tcg=610757
