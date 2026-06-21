@@ -331,6 +331,15 @@ def add_bid(card, my_bid, final_price, market_value, result,
             (when or _dt.datetime.now().strftime("%Y-%m-%d"), item_id, card,
              my_bid, final_price, market_value, shipping, net, result, note),
         )
+    # 낙찰이면 포트폴리오(trades)에 자동 등록 — 매입가=최종가+배송 (중복 방지)
+    if result == "낙찰" and final_price is not None:
+        try:
+            owned = [(t.get("card") or "") for t in get_trades()]
+            if card not in owned:
+                add_trade(card, round((final_price or 0) + (shipping or 0), 2),
+                          None, "입찰 낙찰 자동등록", market_value)
+        except Exception:
+            pass
 
 
 def get_bids():
