@@ -299,15 +299,21 @@ def _ensure_bidlog(conn):
 
 
 def _net_if_won(market_value, final_price, shipping):
-    """이 가격에 낙찰했다면 되팔아 남는 실제 수익(수수료+배송 반영). 음수=손해."""
+    """이 가격에 낙찰했다면 되팔아 남는 실제 수익(수수료/오퍼+배송 반영). 음수=손해.
+    판매모드(SELL_MODE)에 맞춤 — valuation.evaluate와 동일 기준."""
     if market_value is None or final_price is None:
         return None
-    fee, flat = (0.13, 3.0) if market_value < 100 else \
-        (0.13, 0.0) if market_value < 500 else \
-        (0.12, 0.0) if market_value < 1000 else \
-        (0.10, 0.0) if market_value < 2500 else \
-        (0.09, 0.0) if market_value < 5000 else (0.07, 0.0)
-    net_resale = market_value * (1 - fee) - flat
+    import config
+    if getattr(config, "SELL_MODE", "") == "psa_offer":
+        net_resale = (market_value * getattr(config, "PSA_OFFER_FACTOR", 0.92)
+                      - getattr(config, "RESALE_SHIP_COST", 0.0))
+    else:
+        fee, flat = (0.13, 3.0) if market_value < 100 else \
+            (0.13, 0.0) if market_value < 500 else \
+            (0.12, 0.0) if market_value < 1000 else \
+            (0.10, 0.0) if market_value < 2500 else \
+            (0.09, 0.0) if market_value < 5000 else (0.07, 0.0)
+        net_resale = market_value * (1 - fee) - flat
     return round(net_resale - (final_price + (shipping or 0)), 2)
 
 
