@@ -437,16 +437,24 @@ def _ppt_resolve_id(name, card_number, base, title=""):
     # 4차 폴백: 번호검색이 0건인 카드(PPT가 번호 아닌 세트명으로만 찾아줌 — Champion's Path
     #          #074, Paldean Fates #191, Hidden Fates SV59, Crown Zenith GG12 등) → 제목의
     #          세트명 단서로 재검색. 앞 era코드(SM/SWSH)도 떼며 시도. 번호일치 필수라 안전.
-    if qn and not matched:
-        sh = _set_hint(title)
-        if sh:
-            toks = name.split()
-            for i in range(0, max(1, len(toks))):     # 앞 토큰 0개부터 떼며
-                core = " ".join(toks[i:])
-                b4, m4 = pick(fetch(f"{core} {sh}".strip(), 8))
-                if m4:
-                    best, matched = b4, True
-                    break
+    # ★세트충돌 교정: 이미 매칭됐어도 그 카드의 세트가 제목 세트단서와 안 맞으면(=같은번호
+    #   다른세트에 선점된 것 — Phantasmal Flames Meowth #106가 Platinum #106에 붙는 등)
+    #   세트명으로 재검색해 세트일치 후보로 덮어씀.
+    sh = _set_hint(title)
+    _cur_set = set(re.findall(r"[a-z]{4,}", (best.get("setName") or "").lower())) if best else set()
+    _cross_set = bool(matched and sh and not (_cur_set & set(sh.split())))
+    if qn and sh and (not matched or _cross_set):
+        toks = name.split()
+        for i in range(0, max(1, len(toks))):     # 앞 토큰 0개부터 떼며
+            core = " ".join(toks[i:])
+            b4, m4 = pick(fetch(f"{core} {sh}".strip(), 8))
+            if m4:
+                # 세트충돌 교정 중이면, 새 후보도 세트가 제목과 맞을 때만 채택(엉뚱교정 방지)
+                b4_set = set(re.findall(r"[a-z]{4,}", (b4.get("setName") or "").lower()))
+                if _cross_set and not (b4_set & set(sh.split())):
+                    continue
+                best, matched = b4, True
+                break
 
     # 5차 폴백: 위 검색이 다 0건/불일치 — 카드명 토큰을 '단독'(번호 없이) 검색하고 번호로 확정.
     #          'Squirtle 82'는 0건이나 'Squirtle'만 치면 #82가 결과에 떠 잡힘(빈티지/세트노이즈).

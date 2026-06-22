@@ -467,7 +467,10 @@ with tab1:
                 elif _gxres:
                     gb[1].error(f"❌ Gixen 실패: {_gxres.get('msg')}")
                 else:
-                    gb[1].caption(f"아이템 `{_itemno}` · 위 '내 최대입찰가'로 등록 (종료 {config.GIXEN_BIDOFFSET}초 전)")
+                    gb[1].caption(f"위 '내 최대입찰가'로 등록 (종료 {config.GIXEN_BIDOFFSET}초 전)")
+                # 자동등록 성공/실패와 무관하게 — 수동등록용 아이템번호는 항상 표시
+                _bidv = f"{r['max_bid']:.2f}" if pd.notna(r.get("max_bid")) else "-"
+                st.caption(f"📋 수동등록용 → 아이템번호 `{_itemno}` · 권장입찰가 \\${_bidv}")
             elif _itemno:
                 _bidv = f"{r['max_bid']:.2f}" if pd.notna(r.get("max_bid")) else "-"
                 st.caption(f"🅖 Gixen 등록용 → 아이템번호 `{_itemno}` · 권장입찰가 \\${_bidv} "
