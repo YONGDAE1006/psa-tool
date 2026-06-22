@@ -20,6 +20,9 @@ class GixenError(Exception):
     pass
 
 
+_api_off = False   # 한 번 [501]/DISABLED 확인되면 이후 호출은 네트워크 없이 즉시 실패(속도↑)
+
+
 def enabled():
     """자동등록 사용 가능 여부(자격증명 설정됐는지)."""
     return bool(config.GIXEN_USERNAME and config.GIXEN_PASSWORD)
@@ -47,6 +50,9 @@ def _call(extra):
 
 def add_snipe(item_id, max_bid, bidoffset=None):
     """스나이프 1건 등록. 성공 시 dict 반환, 실패 시 GixenError."""
+    global _api_off
+    if _api_off:                       # 이미 비활성 확인됨 → 네트워크 호출 없이 즉시 실패
+        raise GixenError("API 비활성(이전 확인) — 웹폼 사용")
     iid = _digits(item_id)
     bid = float(max_bid)
     if bid <= 0:
@@ -61,7 +67,10 @@ def add_snipe(item_id, max_bid, bidoffset=None):
             return {"ok": True, "item_id": iid, "max_bid": bid, "raw": txt}
         m = re.match(r"^ERROR \((\d+)\): (.*)$", line)
         if m:
-            raise GixenError("[{}] {}".format(m.group(1), m.group(2)))
+            code, msg = m.group(1), m.group(2)
+            if code == "501" or "DISABLED" in msg.upper():
+                _api_off = True        # 이후 클릭부터 API 스킵
+            raise GixenError("[{}] {}".format(code, msg))
     raise GixenError("예상치 못한 응답: " + txt[:200])
 
 

@@ -14,6 +14,7 @@ import collector
 import config
 import db
 import gixen_api
+import gixen_web
 import links
 import valuation
 
@@ -44,11 +45,23 @@ def _toggle_gixen(item_id):
 
 
 def _register_gixen(item_id, itemno):
-    """🅖 Gixen 자동등록 버튼 콜백 — '내 최대입찰가' 그대로 스나이프 등록(클릭=컨펌)."""
+    """🅖 Gixen 자동등록 버튼 콜백 — '내 최대입찰가' 그대로 스나이프 등록(클릭=컨펌).
+    config.GIXEN_METHOD: auto(API 우선→실패시 웹폼) / api / web."""
     bid = st.session_state.get(f"bid_{item_id}", 0) or 0
+    method = config.GIXEN_METHOD
     try:
-        gixen_api.add_snipe(itemno, bid, bidoffset=config.GIXEN_BIDOFFSET)
-        st.session_state[f"gxres_{item_id}"] = {"ok": True, "bid": float(bid)}
+        via = None
+        if method in ("api", "auto"):
+            try:
+                gixen_api.add_snipe(itemno, bid, bidoffset=config.GIXEN_BIDOFFSET)
+                via = "API"
+            except Exception:
+                if method == "api":
+                    raise
+        if via is None:                          # web 또는 auto 폴백
+            gixen_web.add_snipe(itemno, bid, bidoffset=config.GIXEN_BIDOFFSET)
+            via = "웹"
+        st.session_state[f"gxres_{item_id}"] = {"ok": True, "bid": float(bid), "via": via}
         db.set_gixen_mark(item_id, True)        # 등록 표시 영구 저장
         st.session_state[f"gx_{item_id}"] = True  # 토글도 켜짐 상태로
     except Exception as e:
@@ -440,6 +453,17 @@ with tab1:
             if _own:
                 st.caption(f"📈 자체 낙찰 중앙 ${_own['median']:.0f} (${_own['min']:.0f}~${_own['max']:.0f} · {_own['n']}건)")
 
+            # eBay 증분 규칙: 권장가가 '현재가 + 1증분' 미만이면 입찰이 등록 안 됨(거부).
+            _curb = r.get("current_bid") or 0
+            _mb = r.get("max_bid")
+            if pd.notna(_mb) and _mb and _curb:
+                _inc = valuation.bid_increment(_curb)
+                _minv = _curb + _inc
+                if _mb < _minv:
+                    st.warning(
+                        f"⚠️ **증분 미달 — eBay가 입찰 거부** 현재가 ${_curb:,.0f}대 최소 증분 ${_inc:,.2f} → "
+                        f"유효 입찰 최소 **${_minv:,.0f}** 인데 권장가는 ${_mb:,.0f}뿐. 마진이 얇아 입찰이 안 들어갑니다(놓쳐도 OK).")
+
             cc = st.columns([2, 2, 2, 2, 3])
             cc[0].toggle("Gixen", value=(r["item_id"] in _gx_marks), key=f"gx_{r['item_id']}",
                          on_change=_toggle_gixen, args=(r["item_id"],))
@@ -463,7 +487,7 @@ with tab1:
                              use_container_width=True,
                              on_click=_register_gixen, args=(r["item_id"], _itemno))
                 if _gxres and _gxres.get("ok"):
-                    gb[1].success(f"✅ Gixen 등록됨 · 아이템 {_itemno} · 최대 ${_gxres['bid']:.2f}")
+                    gb[1].success(f"✅ Gixen 등록됨({_gxres.get('via','')}) · 아이템 {_itemno} · 최대 ${_gxres['bid']:.2f}")
                 elif _gxres:
                     gb[1].error(f"❌ Gixen 실패: {_gxres.get('msg')}")
                 else:

@@ -33,6 +33,9 @@ GIXEN_USERNAME = os.getenv("GIXEN_USERNAME", "")
 GIXEN_PASSWORD = os.getenv("GIXEN_PASSWORD", "")
 # 종료 몇 초 전에 입찰할지(Gixen 기본 6초). 막판 스나이핑일수록 작게.
 GIXEN_BIDOFFSET = int(os.getenv("GIXEN_BIDOFFSET", "6"))
+# 등록 방식: auto(API 우선, 막히면 웹폼 자동전환) / api(API만) / web(웹폼만).
+# Gixen API가 [501] DISABLED면 auto가 웹 로그인+폼제출로 자동 우회.
+GIXEN_METHOD = os.getenv("GIXEN_METHOD", "auto").strip().lower()
 SEARCH_QUERY = os.getenv("SEARCH_QUERY", "pokemon psa10")  # 붙여써야 PSA10만 정확히 잡힘
 SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "250"))  # 한 번에 가져올 매물 수(100≈6h, 250≈15h 커버)
 # 상승추세 카드: PPT 90일가중 시세가 최근가를 못 따라갈 때 priceHistory 최근값으로 보정.

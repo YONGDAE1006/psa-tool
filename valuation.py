@@ -34,6 +34,21 @@ def sell_fee_rate(price):
     return sell_fees(price)[0]
 
 
+def bid_increment(price):
+    """eBay 미국 경매 최소 입찰 증분(현재가 구간별). 이만큼은 더 높여야 유효한 입찰."""
+    p = price or 0
+    if p < 1:     return 0.05
+    if p < 5:     return 0.25
+    if p < 25:    return 0.50
+    if p < 100:   return 1.00
+    if p < 250:   return 2.50
+    if p < 500:   return 5.00
+    if p < 1000:  return 10.00
+    if p < 2500:  return 25.00
+    if p < 5000:  return 50.00
+    return 100.00
+
+
 def evaluate(current_bid, shipping, psa10_price):
     if not psa10_price or psa10_price <= 0:
         return {"cost": None, "net_resale": None, "profit": None, "roi": None,
@@ -58,6 +73,13 @@ def evaluate(current_bid, shipping, psa10_price):
     cap_roi = net_resale / (1 + config.MIN_ROI)
     max_bid = max(0, min(cap_profit, cap_roi) - ship)
 
+    # eBay 증분 규칙: 내 최대입찰가(프록시)는 '현재가 + 1증분' 이상이어야 입찰이 등록됨.
+    # 그 미만이면 마진이 너무 얇아 eBay가 거부함(=Mega Gengar 사례). biddable로 표시.
+    cur = current_bid or 0
+    inc = bid_increment(cur)
+    min_valid_bid = round(cur + inc, 2)
+    biddable = round(max_bid, 2) >= min_valid_bid
+
     return {
         "cost": round(cost, 2),
         "net_resale": round(net_resale, 2),
@@ -65,6 +87,9 @@ def evaluate(current_bid, shipping, psa10_price):
         "roi": round(roi, 4) if roi is not None else None,
         "breakeven_bid": round(breakeven_bid, 2),
         "max_bid": round(max_bid, 2),
+        "increment": inc,
+        "min_valid_bid": min_valid_bid,
+        "biddable": biddable,
     }
 
 
