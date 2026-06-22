@@ -94,6 +94,15 @@ def _set_hint(title):
     return " ".join(out)
 
 
+def _strip_bundle(text):
+    """번들/덤 제목에서 '메인 카드'만 남김. 'Venusaur ex 182 ... + Bonus Raticate #99'
+    처럼 보너스 카드가 붙으면 번호·이름 추출이 그쪽으로 오염됨 → '+'/'bonus'/'w/' 뒤를 잘라냄."""
+    t = text or ""
+    t = re.split(r"\s*(?:\+|\bw/\b|\bplus\b|\bbonus\b|\bwith bonus\b)",
+                 t, maxsplit=1, flags=re.I)[0]
+    return t.strip() or (text or "")
+
+
 def _ppt_query(text):
     """PPT 검색용 깔끔한 문자열 (긴 제목에서 카드 이름만 추출)."""
     t = text or ""
@@ -127,10 +136,11 @@ def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=Fa
 
     # 카드 이름(노이즈 제거) + 카드번호(#183 등)로 식별.
     # 검색·캐시 모두 '이름+번호'로 묶어야 동명이카드(번호만 다른 카드) 혼선/캐시충돌 방지.
-    name = _ppt_query(title or query) or (query or "").strip()
+    src = _strip_bundle(title or query or "")
+    name = _ppt_query(src) or (query or "").strip()
     if not name:
         return None
-    card_number = extract_card_number(title or query or "")
+    card_number = extract_card_number(src)
     key = f"{name} #{card_number}" if card_number else name
 
     cached = db.get_sold_cache(key, config.SOLD_CACHE_HOURS)
@@ -369,13 +379,22 @@ def _ppt_resolve_id(name, card_number, base, title=""):
         """결과 중 이름 유사도+번호일치로 최선 선택. 반환 (best, matched)."""
         best, best_score, matched = None, -1.0, False
         for it in items or []:
-            cand = f"{it.get('setName','')} {it.get('name','')}"
+            cname = it.get("name", "") or ""
+            cand = f"{it.get('setName','')} {cname}"
             score = fuzz.token_set_ratio(name, cand)
+            # 카드명(세트 제외)이 제목/질의와 실제로 겹치는지 — 번호우연일치 오매칭 차단.
+            # 예: 'Birthday Pikachu #24'가 'Ducklett 24'(세트명에 Pikachu)에 붙는 것 방지.
+            nm_score = fuzz.token_set_ratio(name, cname)
+            ctoks = re.findall(r"[a-z]{4,}", cname.lower())
+            name_ok = (nm_score >= 40
+                       or any(w in name.lower() or w in title_low for w in ctoks))
             c = cnum(it)
             if qn and c:
-                if qn == c:
-                    score += 50          # 번호 일치 = 강한 우선
+                if qn == c and name_ok:
+                    score += 50          # 번호+이름 일치 = 강한 우선
                     matched = True
+                elif qn == c:
+                    score -= 60          # 번호만 같고 카드명 전혀 다름 = 오매칭 → 강한 페널티
                 else:
                     score -= 30          # 번호 불일치 = 강한 페널티
             # 세트충돌 해소: 후보 setName 주요단어가 제목 원문에 있으면 가산

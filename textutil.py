@@ -39,6 +39,14 @@ def extract_card_number(text: str):
     m = re.search(r"\b(0\d{1,3})\b", t)
     if m:
         return m.group(1)
+    # 맨숫자 단독 폴백 — 등급(psa/cgc/bgs N)·연도(19xx/20xx) 제거 후 1~3자리 숫자가
+    # '딱 하나'면 그게 카드번호(159·177·203 등). 여럿이면 모호하므로 포기(오추출 방지).
+    t2 = re.sub(r"\b(psa|cgc|bgs|sgc|gem\s*mt?|mint|nm)\s*\d+", " ", t)
+    t2 = re.sub(r"\bpop(ulation)?\s*\d+", " ", t2)   # PSA 인구수 'POP 1' 오추출 방지
+    t2 = re.sub(r"\b(19|20)\d{2}\b", " ", t2)
+    uniq = set(re.findall(r"\b\d{1,3}\b", t2))
+    if len(uniq) == 1:
+        return uniq.pop()
     return None
 
 

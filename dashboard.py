@@ -13,6 +13,7 @@ import streamlit as st
 import collector
 import config
 import db
+import gixen_api
 import links
 import valuation
 
@@ -40,6 +41,18 @@ def _card_img_html(url, cap):
 def _toggle_gixen(item_id):
     """Gixen 등록 체크 토글 → DB 저장(영구 유지)."""
     db.set_gixen_mark(item_id, bool(st.session_state.get(f"gx_{item_id}", False)))
+
+
+def _register_gixen(item_id, itemno):
+    """🅖 Gixen 자동등록 버튼 콜백 — '내 최대입찰가' 그대로 스나이프 등록(클릭=컨펌)."""
+    bid = st.session_state.get(f"bid_{item_id}", 0) or 0
+    try:
+        gixen_api.add_snipe(itemno, bid, bidoffset=config.GIXEN_BIDOFFSET)
+        st.session_state[f"gxres_{item_id}"] = {"ok": True, "bid": float(bid)}
+        db.set_gixen_mark(item_id, True)        # 등록 표시 영구 저장
+        st.session_state[f"gx_{item_id}"] = True  # 토글도 켜짐 상태로
+    except Exception as e:
+        st.session_state[f"gxres_{item_id}"] = {"ok": False, "msg": str(e)}
 
 
 def _exclude_item(item_id, title=""):
@@ -411,9 +424,18 @@ with tab1:
             _sn = int(r["sold_n"]) if pd.notna(r.get("sold_n")) else 0
             _roi_s = f" · ROI {r['ROI%']:.0f}%" if pd.notna(r.get("ROI%")) else ""
             st.caption(f"손익분기 {_money(r['breakeven_bid'])} · 표본 {_sn}건{_roi_s} · 시세기준 {_mn}")
-            if (pd.notna(r.get("market_value")) and r.get("current_bid")
-                    and r["market_value"] > r["current_bid"] * 4):
-                st.caption("⚠️ 시세가 현재가 4배+ — 오매칭 의심, 이미지·세트 확인")
+            # 가격-상식 가드: 입찰 많이 붙었는데 현재가가 시세의 40% 미만 →
+            # 실물이 PSA8·9(제목만 PSA10)이거나 오매칭일 확률 큼. 시장(입찰)이 정답.
+            _cb = (r.get("current_bid") or 0) + (r.get("shipping") or 0)
+            _mvv = r.get("market_value")
+            if pd.notna(_mvv) and _mvv and _cb and _cb < _mvv * 0.4:
+                _bc = int(r["bid_count"]) if pd.notna(r.get("bid_count")) else 0
+                _pct = _cb / _mvv * 100
+                st.warning(
+                    f"⚠️ **실물 등급/매칭 의심** — 입찰 {_bc}명이 붙었는데 현재가(+배송)가 "
+                    f"시세의 **{_pct:.0f}%**뿐입니다. 시장이 이걸 PSA10으로 안 본다는 뜻 → "
+                    f"**실물이 PSA8·9인데 제목만 PSA10**이거나 **다른 카드와 오매칭**일 가능성이 큽니다. "
+                    f"실물 이미지의 PSA 등급라벨·카드번호를 꼭 확인하세요. (위 예상수익 무시)")
             _own = db.get_own_price(_ck)
             if _own:
                 st.caption(f"📈 자체 낙찰 중앙 ${_own['median']:.0f} (${_own['min']:.0f}~${_own['max']:.0f} · {_own['n']}건)")
@@ -432,12 +454,24 @@ with tab1:
                 "내 최대입찰가($)", min_value=0.0, step=1.0,
                 value=float(round(r["max_bid"], 2)) if pd.notna(r.get("max_bid")) else 0.0,
                 key=f"bid_{r['item_id']}")
-            # Gixen 수동 등록용: eBay 아이템번호 + 권장입찰가(복사해서 Gixen에 붙여넣기)
+            # 🅖 Gixen 자동등록 — '내 최대입찰가'(위 입력칸, 기본=권장가)로 스나이프 등록. 클릭=컨펌.
             _itemno = links.ebay_item_number(r.get("url"), r.get("item_id"))
-            if _itemno:
+            _gxres = st.session_state.get(f"gxres_{r['item_id']}")
+            if _itemno and gixen_api.enabled():
+                gb = st.columns([2, 6])
+                gb[0].button("🅖 Gixen 자동등록", key=f"gxapi_{r['item_id']}",
+                             use_container_width=True,
+                             on_click=_register_gixen, args=(r["item_id"], _itemno))
+                if _gxres and _gxres.get("ok"):
+                    gb[1].success(f"✅ Gixen 등록됨 · 아이템 {_itemno} · 최대 ${_gxres['bid']:.2f}")
+                elif _gxres:
+                    gb[1].error(f"❌ Gixen 실패: {_gxres.get('msg')}")
+                else:
+                    gb[1].caption(f"아이템 `{_itemno}` · 위 '내 최대입찰가'로 등록 (종료 {config.GIXEN_BIDOFFSET}초 전)")
+            elif _itemno:
                 _bidv = f"{r['max_bid']:.2f}" if pd.notna(r.get("max_bid")) else "-"
                 st.caption(f"🅖 Gixen 등록용 → 아이템번호 `{_itemno}` · 권장입찰가 \\${_bidv} "
-                           "(복사해 Gixen에 붙여넣은 뒤 위 Gixen 토글 체크)")
+                           "(.env에 GIXEN_USERNAME/PASSWORD 넣으면 자동등록 버튼이 생깁니다)")
             _mp_key = f"mp_{r['item_id']}"
             st.number_input("✏️ 수동 시세($) — 이 카드 전체 적용, 0=해제",
                 min_value=0.0, value=float(_manual or 0), step=1.0, key=_mp_key,

@@ -69,7 +69,7 @@ def run():
     alert_rows = []   # 목록엔 안 넣지만 너무 좋아서 알림만 보낼 위험(하락) 매물
     skipped = {"country": 0, "shipping": 0, "currency": 0, "foreign": 0, "budget": 0,
                "keyword": 0, "lowvalue": 0, "lowprofit": 0, "bids": 0, "risky": 0,
-               "seller": 0, "excluded": 0}
+               "seller": 0, "excluded": 0, "nonpoke": 0}
     _excluded = db.get_excluded()        # 사용자가 '제외'한 매물 — 다시 안 긁어옴
     for it in listings:
         title = it["title"]
@@ -101,6 +101,14 @@ def run():
                or re.search(r"\bar\b|\b[a-z]{1,3}\d{1,2}[a-z]\b", low))
         if config.ENGLISH_ONLY and _jp:
             skipped["foreign"] += 1
+            continue
+        # 비포켓몬(유희왕 등) 제외 — 'pokemon psa10' 검색에 섞여 들어온 타 게임 카드.
+        # 'yugioh' 단어 또는 YGO 세트코드(LOB-009·LCKC-EN001·DT02-EN032 형식)이면서 포켓몬 표기 없음.
+        _ygo = ("yugioh" in low or "yu-gi-oh" in low
+                or (re.search(r"\b[a-z]{2,4}\d{0,2}-(en)?\d{3}\b", low)
+                    and "pokemon" not in low and "pokémon" not in title.lower()))
+        if _ygo:
+            skipped["nonpoke"] += 1
             continue
         if any(kw in low for kw in config.EXCLUDE_KEYWORDS):
             skipped["keyword"] += 1
@@ -271,6 +279,7 @@ def run():
           f"foreign(영어판아님): {skipped['foreign']}, "
           f"bids<{config.MIN_BID_COUNT}: {skipped['bids']}, keyword: {skipped['keyword']}, "
           f"seller<{config.MIN_SELLER_FEEDBACK}: {skipped['seller']}, "
+          f"nonpoke(비포켓몬): {skipped['nonpoke']}, "
           f"risky(hidden): {skipped['risky']}, risky-alerts: {len(alert_rows)}")
     return len(out)
 

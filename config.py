@@ -28,6 +28,11 @@ EBAY_SHIP_ZIP = os.getenv("EBAY_SHIP_ZIP", "19720")
 # Gixen 스나이핑 사이트. m.gixen.com 폐쇄, /mobile/?프리필도 메인으로 튕김(미지원)
 # → 그냥 로그인된 메인(스나이프 추가 폼)으로 열고 번호·입찰가는 대시보드서 복붙.
 GIXEN_URL = os.getenv("GIXEN_URL", "https://www.gixen.com")
+# Gixen 공식 API 자동등록용 로그인(= Gixen 계정 ID/비번). 비우면 자동등록 비활성(복붙 안내만).
+GIXEN_USERNAME = os.getenv("GIXEN_USERNAME", "")
+GIXEN_PASSWORD = os.getenv("GIXEN_PASSWORD", "")
+# 종료 몇 초 전에 입찰할지(Gixen 기본 6초). 막판 스나이핑일수록 작게.
+GIXEN_BIDOFFSET = int(os.getenv("GIXEN_BIDOFFSET", "6"))
 SEARCH_QUERY = os.getenv("SEARCH_QUERY", "pokemon psa10")  # 붙여써야 PSA10만 정확히 잡힘
 SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", "250"))  # 한 번에 가져올 매물 수(100≈6h, 250≈15h 커버)
 # 상승추세 카드: PPT 90일가중 시세가 최근가를 못 따라갈 때 priceHistory 최근값으로 보정.
@@ -60,7 +65,8 @@ FOREIGN_MARKERS = [
     w.strip().lower() for w in os.getenv(
         "FOREIGN_MARKERS",
         # 언어/지역 단어만 제외. 일본 세트코드는 통과시켜 PPT가 시세 있는지 조회(혹시 모르니).
-        "japanese,japan,jpn,jp ,korean,chinese,german,french,spanish,italian,portuguese,taiwan"
+        "japanese,japan,jpn,jp ,korean,chinese,german,french,spanish,italian,portuguese,taiwan,"
+        "indonesia,thailand,thai,vietnam,philippines,carddass"
     ).split(",") if w.strip()
 ]
 # 제목에 이 단어가 있으면 제외 (묶음/커스텀/가짜 등). 쉼표로 구분.
