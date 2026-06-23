@@ -541,16 +541,20 @@ with tab2:
 with tab3:
     st.caption("내가 실제로 사고판 결과를 기록 → 도구가 잘 맞히는지, 내 수익이 얼마인지 추적합니다.")
     with st.form("add_trade", clear_on_submit=True):
-        f1, f2, f3, f4 = st.columns([3, 1, 1, 1])
+        f1, f2, f3, f4, f5 = st.columns([3, 1, 1, 1, 1])
         t_card = f1.text_input("카드명")
-        t_buy = f2.number_input("매입가($)", min_value=0.0, step=1.0)
-        t_mkt = f3.number_input("현재시세($, 선택)", min_value=0.0, step=1.0,
+        t_buy = f2.number_input("낙찰가($)", min_value=0.0, step=1.0)
+        t_ship = f3.number_input("배송비($)", min_value=0.0, step=0.5,
+                                 help="매입 시 낸 배송비 → 매입가(총원가)에 자동 합산")
+        t_mkt = f4.number_input("현재시세($, 선택)", min_value=0.0, step=1.0,
                                 help="보유중 카드의 현재 시세 → 포트폴리오 평가손익 계산")
-        t_sell = f4.number_input("판매가($, 미판매=0)", min_value=0.0, step=1.0)
+        t_sell = f5.number_input("판매가($, 미판매=0)", min_value=0.0, step=1.0)
         t_note = st.text_input("메모 (선택)")
         if st.form_submit_button("기록 추가") and t_card:
-            db.add_trade(t_card, t_buy, t_sell or None, t_note, t_mkt or None)
-            st.success("추가됨")
+            _total_buy = round((t_buy or 0) + (t_ship or 0), 2)   # 매입가 = 낙찰가 + 배송비
+            _note = t_note + (f" (배송 ${t_ship:.2f} 포함)" if t_ship else "")
+            db.add_trade(t_card, _total_buy, t_sell or None, _note, t_mkt or None)
+            st.success(f"추가됨 (매입가 ${_total_buy:,.2f} = 낙찰 ${t_buy:,.2f} + 배송 ${t_ship:,.2f})")
             st.rerun()
 
     trades = db.get_trades()

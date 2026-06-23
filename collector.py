@@ -69,7 +69,7 @@ def run():
     alert_rows = []   # 목록엔 안 넣지만 너무 좋아서 알림만 보낼 위험(하락) 매물
     skipped = {"country": 0, "shipping": 0, "currency": 0, "foreign": 0, "budget": 0,
                "keyword": 0, "lowvalue": 0, "lowprofit": 0, "bids": 0, "risky": 0,
-               "seller": 0, "excluded": 0, "nonpoke": 0}
+               "seller": 0, "excluded": 0, "nonpoke": 0, "grade": 0}
     _excluded = db.get_excluded()        # 사용자가 '제외'한 매물 — 다시 안 긁어옴
     for it in listings:
         title = it["title"]
@@ -119,6 +119,15 @@ def run():
 
         meets_bids = (it.get("bid_count") or 0) >= config.MIN_BID_COUNT
 
+        # eBay 정형필드(Set/Card Name/Card Number/Grade) — 제목추측보다 정확한 매칭용.
+        # 입찰 충족 매물만 조회(=실제 시세 조회 대상, getItem 호출 절약).
+        aspects = ebay_client.fetch_item_aspects(it.get("item_id")) if meets_bids else {}
+        # Grade 필드가 PSA10이 아니면 제외 (제목만 PSA10인 PSA8·9 오기재 사기 차단)
+        _g = (aspects.get("grade") or "").lower()
+        if _g and not re.search(r"(?<!\d)10(?!\d)|gem", _g):
+            skipped["grade"] += 1
+            continue
+
         pc, score = matcher.match(title, index)
         psa10 = pc["psa10_price"] if pc else None
 
@@ -129,7 +138,7 @@ def run():
             title, score,
         )
         sold = soldprices.get_sold(query, demo_hint=psa10, title=title,
-                                   cache_only=not meets_bids)
+                                   cache_only=not meets_bids, aspects=aspects)
 
         # 시세 기준 결정: 신뢰할 만한 실낙찰가가 있으면 그걸, 없으면 추정가
         value_trend = value_conf = None
@@ -279,7 +288,7 @@ def run():
           f"foreign(영어판아님): {skipped['foreign']}, "
           f"bids<{config.MIN_BID_COUNT}: {skipped['bids']}, keyword: {skipped['keyword']}, "
           f"seller<{config.MIN_SELLER_FEEDBACK}: {skipped['seller']}, "
-          f"nonpoke(비포켓몬): {skipped['nonpoke']}, "
+          f"nonpoke(비포켓몬): {skipped['nonpoke']}, grade(PSA10아님): {skipped['grade']}, "
           f"risky(hidden): {skipped['risky']}, risky-alerts: {len(alert_rows)}")
     return len(out)
 

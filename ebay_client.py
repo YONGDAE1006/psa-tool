@@ -48,6 +48,42 @@ def _get_oauth_token():
     return _token_cache["token"]
 
 
+# eBay 정형필드(localizedAspects) → 내부 키 매핑. 매칭 정확도용(제목 추측 대체).
+_ASPECT_MAP = {
+    "card name": "name", "card": "name", "character": "character",
+    "set": "set", "card number": "number",
+    "grade": "grade", "card condition": "grade", "card grade": "grade",
+    "certification number": "cert", "professional grader": "grader",
+    "language": "language",
+}
+
+
+def fetch_item_aspects(item_id):
+    """getItem 으로 카드 정형정보(Card Name/Set/Card Number/Grade/Cert/Language) 조회.
+    셀러가 입력한 구조화 필드라 제목 파싱보다 정확. 실패/미지원 시 {} 반환."""
+    if config.MODE != "live" or config.EBAY_PROVIDER != "official" or not item_id:
+        return {}
+    try:
+        token = _get_oauth_token()
+        r = requests.get(
+            f"https://api.ebay.com/buy/browse/v1/item/{item_id}",
+            headers={"Authorization": f"Bearer {token}",
+                     "X-EBAY-C-MARKETPLACE-ID": config.EBAY_MARKETPLACE},
+            timeout=30,
+        )
+        if r.status_code != 200:
+            return {}
+        out = {}
+        for a in (r.json().get("localizedAspects") or []):
+            key = _ASPECT_MAP.get((a.get("name") or "").strip().lower())
+            val = (a.get("value") or "").strip()
+            if key and val and key not in out:
+                out[key] = val
+        return out
+    except requests.RequestException:
+        return {}
+
+
 def _fetch_live():
     token = _get_oauth_token()
     headers = {

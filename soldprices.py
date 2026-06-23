@@ -94,6 +94,26 @@ def _set_hint(title):
     return " ".join(out)
 
 
+_SET_GENERIC = {"promo", "promos", "collection", "pokemon", "trainer", "gallery",
+                "pack", "cards", "card", "holo", "english", "tcg", "set", "the",
+                "and", "edition", "base"}
+
+
+def _set_words(text):
+    """eBay Set 필드 → 식별용 단어만 (소문자, 3글자+, 제네릭/era코드 제거).
+    'Sv10: Destined Rivals'→'destined rivals', 'Swsh11: Lost Origin'→'lost origin'."""
+    t = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode().lower()
+    out = []
+    for w in re.findall(r"[a-z]{3,}", t):
+        if w in _SET_GENERIC:
+            continue
+        if w in ("swsh", "sv", "sm", "xy", "bw", "hgss", "me"):   # era 코드 단독
+            continue
+        if w not in out:
+            out.append(w)
+    return " ".join(out)
+
+
 def _strip_bundle(text):
     """번들/덤 제목에서 '메인 카드'만 남김. 'Venusaur ex 182 ... + Bonus Raticate #99'
     처럼 보너스 카드가 붙으면 번호·이름 추출이 그쪽으로 오염됨 → '+'/'bonus'/'w/' 뒤를 잘라냄."""
@@ -122,8 +142,10 @@ def _ppt_query(text):
     return t
 
 
-def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=False):
-    """cache_only=True 면 새 API 호출 없이 캐시에 있을 때만 반환(크레딧 0)."""
+def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=False,
+             aspects=None):
+    """cache_only=True 면 새 API 호출 없이 캐시에 있을 때만 반환(크레딧 0).
+    aspects: eBay 정형필드(Card Name/Set/Card Number) — 있으면 제목추측 대신 우선 사용."""
     global _budget
     provider = config.SOLD_PROVIDER
 
@@ -134,14 +156,21 @@ def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=Fa
         except Exception:
             return None
 
-    # 카드 이름(노이즈 제거) + 카드번호(#183 등)로 식별.
-    # 검색·캐시 모두 '이름+번호'로 묶어야 동명이카드(번호만 다른 카드) 혼선/캐시충돌 방지.
+    # 카드 식별: eBay 정형필드(aspects) 우선 → 없으면 제목 파싱.
+    asp = aspects or {}
     src = _strip_bundle(title or query or "")
-    name = _ppt_query(src) or (query or "").strip()
+    # 이름: Card Name(노이즈 0) 우선
+    name = (_ppt_query(asp["name"]) if asp.get("name") else "") \
+        or _ppt_query(src) or (query or "").strip()
     if not name:
         return None
-    card_number = extract_card_number(src)
+    # 번호: Card Number 우선(추측 불필요). 'TG29/TG30'·'213' 등도 정규화됨.
+    card_number = extract_card_number(asp.get("number") or "") or extract_card_number(src)
+    # 세트단서: Set 필드(있으면) → 세트충돌 해소
+    set_hint = _set_words(asp.get("set") or "") or None
     key = f"{name} #{card_number}" if card_number else name
+    if set_hint:
+        key += " @" + set_hint
 
     cached = db.get_sold_cache(key, config.SOLD_CACHE_HOURS)
     if cached is not None:
@@ -156,7 +185,15 @@ def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=Fa
 
     try:
         if provider == "pokemonpricetracker":
-            data = _ppt(name, card_number, tcgplayer_id, title or query or "")
+            data = _ppt(name, card_number, tcgplayer_id,
+                        ((title or query or "") + " " + (asp.get("set") or "")).strip(),
+                        set_hint=set_hint)
+            # aspects 매칭 실패 → 셀러가 정형필드를 잘못 입력했을 수 있음 → 제목 기반 1회 재시도
+            if data is None and asp:
+                t_name = _ppt_query(src) or name
+                t_num = extract_card_number(src)
+                if (t_name, t_num) != (name, card_number):
+                    data = _ppt(t_name, t_num, tcgplayer_id, title or query or "")
         elif provider == "ebay_insights":
             data = _ebay_insights(name)
         else:
@@ -292,14 +329,14 @@ def _ppt_get(url, params):
     return None
 
 
-def _ppt(name, card_number, tcgplayer_id, title=""):
+def _ppt(name, card_number, tcgplayer_id, title="", set_hint=None):
     if not config.PPT_API_KEYS:
         return None
     base = config.PPT_BASE_URL.rstrip("/")
 
     num_confirmed = bool(tcgplayer_id)        # 외부에서 명시한 id면 신뢰
     if not tcgplayer_id:
-        tcgplayer_id, num_confirmed = _ppt_resolve_id(name, card_number, base, title)
+        tcgplayer_id, num_confirmed = _ppt_resolve_id(name, card_number, base, title, set_hint=set_hint)
     if not tcgplayer_id:
         return None
 
@@ -356,7 +393,7 @@ def _ppt(name, card_number, tcgplayer_id, title=""):
     }
 
 
-def _ppt_resolve_id(name, card_number, base, title=""):
+def _ppt_resolve_id(name, card_number, base, title="", set_hint=None):
     """이름(+카드번호) -> (tcgPlayerId, num_confirmed).
 
     - 번호가 있으면 '이름 번호'로 검색(예: 'Charizard ex 183') → 그 카드 1건을 정확히 집고
@@ -364,10 +401,16 @@ def _ppt_resolve_id(name, card_number, base, title=""):
     - 제목에 번호가 있는데 어떤 후보와도 번호가 안 맞으면 (None, False)
       = 엉뚱한 카드를 가져오느니 차라리 버린다(오매칭 방지).
     - 번호가 없으면 이름 유사도로만 고르되 미확정(False)으로 표시.
+    - set_hint: eBay 정형필드 Set(있으면) → 세트충돌 해소 정확도↑.
     """
     qn = _norm_num(card_number)                 # 비교/캐시용 정규화 번호('027'->'27')
-    title_low = (title or "").lower()           # 세트충돌 해소용 제목 원문
+    # 세트단서: aspects Set 우선, 없으면 제목에서 추출. 세트충돌 해소·후보 가산에 사용.
+    sh = set_hint or _set_hint(title)
+    # 후보 setName 단어를 비교할 건초더미 = 제목 + 세트단서 (둘 중 어디든 있으면 가산)
+    hay = ((title or "") + " " + (sh or "")).lower().strip()
     cache_key = f"{name} #{qn}" if qn else name
+    if set_hint:                                # 세트 명시되면 캐시키도 분리(정확)
+        cache_key += " @" + set_hint
     cached = db.get_id_cache(cache_key)
     if cached:
         return cached, bool(qn)
@@ -387,7 +430,7 @@ def _ppt_resolve_id(name, card_number, base, title=""):
             nm_score = fuzz.token_set_ratio(name, cname)
             ctoks = re.findall(r"[a-z]{4,}", cname.lower())
             name_ok = (nm_score >= 40
-                       or any(w in name.lower() or w in title_low for w in ctoks))
+                       or any(w in name.lower() or w in hay for w in ctoks))
             c = cnum(it)
             if qn and c:
                 if qn == c and name_ok:
@@ -401,7 +444,7 @@ def _ppt_resolve_id(name, card_number, base, title=""):
             # (같은 번호 다른 세트 — First Partner #038 vs Mega Evolution #038 구분)
             sw = [w for w in re.findall(r"[a-z]{4,}", (it.get("setName") or "").lower())
                   if w not in ("promo", "collection", "pokemon", "trainer", "gallery", "pack")]
-            if title_low and sw and any(w in title_low for w in sw):
+            if hay and sw and any(w in hay for w in sw):
                 score += 25
             if score > best_score:
                 best_score, best = score, it
@@ -440,7 +483,6 @@ def _ppt_resolve_id(name, card_number, base, title=""):
     # ★세트충돌 교정: 이미 매칭됐어도 그 카드의 세트가 제목 세트단서와 안 맞으면(=같은번호
     #   다른세트에 선점된 것 — Phantasmal Flames Meowth #106가 Platinum #106에 붙는 등)
     #   세트명으로 재검색해 세트일치 후보로 덮어씀.
-    sh = _set_hint(title)
     _cur_set = set(re.findall(r"[a-z]{4,}", (best.get("setName") or "").lower())) if best else set()
     _cross_set = bool(matched and sh and not (_cur_set & set(sh.split())))
     if qn and sh and (not matched or _cross_set):
