@@ -101,8 +101,13 @@ _SET_GENERIC = {"promo", "promos", "collection", "pokemon", "trainer", "gallery"
 
 def _set_words(text):
     """eBay Set 필드 → 식별용 단어만 (소문자, 3글자+, 제네릭/era코드 제거).
-    'Sv10: Destined Rivals'→'destined rivals', 'Swsh11: Lost Origin'→'lost origin'."""
+    'Sv10: Destined Rivals'→'destined rivals', 'Swsh11: Lost Origin'→'lost origin',
+    '2025 POKEMON PFL EN-PHANTASMAL FLAMES'→'phantasmal flames'(코드 PFL·연도 제거)."""
     t = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode().lower()
+    # eBay 형식 '{연도} POKEMON {코드} EN-{세트명}' 또는 '{코드}: {세트명}' → 뒷부분만 세트명.
+    m = re.search(r"(?:\ben[- ]|:\s*)(.+)$", t)
+    if m:
+        t = m.group(1)
     out = []
     for w in re.findall(r"[a-z]{3,}", t):
         if w in _SET_GENERIC:

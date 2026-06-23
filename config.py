@@ -68,8 +68,8 @@ FOREIGN_MARKERS = [
     w.strip().lower() for w in os.getenv(
         "FOREIGN_MARKERS",
         # 언어/지역 단어만 제외. 일본 세트코드는 통과시켜 PPT가 시세 있는지 조회(혹시 모르니).
-        "japanese,japan,jpn,jp ,korean,chinese,german,french,spanish,italian,portuguese,taiwan,"
-        "indonesia,thailand,thai,vietnam,philippines,carddass"
+        "japanese,japan,jpn,jp ,korean,korea,chinese,china,german,french,spanish,italian,"
+        "portuguese,taiwan,indonesia,thailand,thai,vietnam,philippines,carddass"
     ).split(",") if w.strip()
 ]
 # 제목에 이 단어가 있으면 제외 (묶음/커스텀/가짜 등). 쉼표로 구분.

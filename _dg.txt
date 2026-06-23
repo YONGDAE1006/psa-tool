@@ -1,0 +1,11 @@
+227391938238: 목록에 없음
+
+제목: 2023 Pokemon China Shining Synergy Gardevoir Sylveon GX Rare #16
+  현재 저장된 매칭: (없음)
+  aspects: name=None | set=None | num=None | grade=None
+  => 신선 재매칭: 실패(None)
+
+제목: 2025 POKEMON PFL EN-PHANTASMAL FLAMES ILLUSTRATION RARE #106 MEO
+  현재 저장된 매칭: Meowth - 106/146 [Platinum] 106/146 · Burger King Promos
+  aspects: name=MEOWTH | set=2025 POKEMON PFL EN-PHANTASMAL FLAMES | num=106 | grade=10
+  => 신선 재매칭: Meowth - 106/146 [Platinum] 106/146 · Burger King Promo | $None | n=0
