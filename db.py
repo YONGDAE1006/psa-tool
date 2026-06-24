@@ -487,6 +487,42 @@ def set_excluded(item_id, title="", on=True):
             conn.execute("DELETE FROM excluded_items WHERE item_id = ?", (item_id,))
 
 
+def _ensure_blocked(conn):
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS blocked_items (
+               item_id TEXT PRIMARY KEY, title TEXT, url TEXT, reason TEXT,
+               detail TEXT, current_bid REAL, end_time TEXT, at TEXT)""")
+
+
+def clear_blocked():
+    """수집 시작 시 차단목록 초기화(매 수집마다 새로 기록)."""
+    with get_conn() as conn:
+        _ensure_blocked(conn)
+        conn.execute("DELETE FROM blocked_items")
+
+
+def add_blocked(item_id, title="", url="", reason="", detail="",
+                current_bid=None, end_time=""):
+    """수집 중 차단된 매물 기록(검토용 — grade사기/유희왕/키워드/위험 등)."""
+    import datetime as _dt
+    with get_conn() as conn:
+        _ensure_blocked(conn)
+        conn.execute(
+            "INSERT OR REPLACE INTO blocked_items "
+            "(item_id, title, url, reason, detail, current_bid, end_time, at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (item_id, title, url, reason, detail, current_bid, end_time,
+             _dt.datetime.now(_dt.timezone.utc).isoformat()))
+
+
+def get_blocked():
+    """차단 매물 목록 (최근순)."""
+    with get_conn() as conn:
+        _ensure_blocked(conn)
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM blocked_items ORDER BY reason, at DESC")]
+
+
 def _ensure_sold_log(conn):
     conn.execute("CREATE TABLE IF NOT EXISTS sold_log ("
                  "item_id TEXT PRIMARY KEY, card_key TEXT, title TEXT, "

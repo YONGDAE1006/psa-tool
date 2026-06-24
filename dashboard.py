@@ -342,8 +342,8 @@ except ValueError:
     pass
 st.caption(f"🕒 마지막 수집 {_ago(_last)}{_stale_collect}")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["🎯 비딩 후보", "🔥 인기·거래량", "📒 거래 기록", "📝 입찰 기록", "💼 포트폴리오"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["🎯 비딩 후보", "🔥 인기·거래량", "📒 거래 기록", "📝 입찰 기록", "💼 포트폴리오", "🚫 차단목록"])
 
 # ============== 탭 1: 비딩 후보 ==============
 with tab1:
@@ -710,6 +710,31 @@ with tab5:
         if st.button("비용 삭제") and dcid:
             db.delete_cost(int(dcid))
             st.rerun()
+
+# ============== 탭 6: 차단목록 ==============
+with tab6:
+    st.caption("이번 수집에서 **차단된 매물** (검토용). 특히 ⚠️**등급사기의심** = 제목엔 PSA10인데 "
+               "eBay Grade 필드는 다른 등급 → 실물이 PSA8·9일 수 있음.")
+    blocked = db.get_blocked()
+    if not blocked:
+        st.info("차단된 매물이 없습니다. (다음 수집부터 기록됩니다)")
+    else:
+        bdf = pd.DataFrame(blocked)
+        cnt = bdf["reason"].value_counts()
+        st.markdown("　".join(f"**{k}** {v}건" for k, v in cnt.items()))
+        _order = {"등급사기의심": 0, "비포켓몬": 1, "키워드": 2, "위험(급락)": 3}
+        bdf["_o"] = bdf["reason"].map(lambda r: _order.get(r, 9))
+        bdf = bdf.sort_values("_o")
+        show = bdf[["reason", "title", "detail", "current_bid", "url"]].rename(columns={
+            "reason": "사유", "title": "제목", "detail": "상세",
+            "current_bid": "현재가", "url": "매물"})
+        st.dataframe(
+            show, use_container_width=True, hide_index=True,
+            column_config={
+                "매물": st.column_config.LinkColumn("매물", display_text="eBay"),
+                "현재가": st.column_config.NumberColumn(format="$%.0f"),
+                "제목": st.column_config.TextColumn(width="large"),
+            })
 
 st.divider()
 with st.expander("계산 방식 / 시세 로직 보는 법"):

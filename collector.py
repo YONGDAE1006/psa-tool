@@ -71,6 +71,12 @@ def run():
                "keyword": 0, "lowvalue": 0, "lowprofit": 0, "bids": 0, "risky": 0,
                "seller": 0, "excluded": 0, "nonpoke": 0, "grade": 0}
     _excluded = db.get_excluded()        # 사용자가 '제외'한 매물 — 다시 안 긁어옴
+    db.clear_blocked()                   # 차단목록 초기화(이번 수집분 새로 기록)
+
+    def _block(it, reason, detail=""):
+        db.add_blocked(it.get("item_id"), it.get("title"), it.get("url"),
+                       reason, detail, it.get("current_bid"), it.get("end_time"))
+
     for it in listings:
         title = it["title"]
         # PSA 10 매물만 (제목에 PSA 10 표기가 있는 것)
@@ -109,9 +115,12 @@ def run():
                     and "pokemon" not in low and "pokémon" not in title.lower()))
         if _ygo:
             skipped["nonpoke"] += 1
+            _block(it, "비포켓몬", "유희왕/타게임 의심")
             continue
-        if any(kw in low for kw in config.EXCLUDE_KEYWORDS):
+        _kw = next((kw for kw in config.EXCLUDE_KEYWORDS if kw in low), None)
+        if _kw:
             skipped["keyword"] += 1
+            _block(it, "키워드", "제외어 '%s'" % _kw)
             continue
         if config.MIN_SELLER_FEEDBACK > 0 and (it.get("seller_feedback") or 0) < config.MIN_SELLER_FEEDBACK:
             skipped["seller"] += 1
@@ -126,6 +135,7 @@ def run():
         _g = (aspects.get("grade") or "").lower()
         if _g and not re.search(r"(?<!\d)10(?!\d)|gem", _g):
             skipped["grade"] += 1
+            _block(it, "등급사기의심", "제목=PSA10인데 Grade필드='%s'" % aspects.get("grade"))
             continue
 
         pc, score = matcher.match(title, index)
@@ -253,6 +263,7 @@ def run():
             if reliable and val["roi"] is not None and val["roi"] >= config.RISKY_ALERT_ROI:
                 alert_rows.append(row)
             skipped["risky"] += 1
+            _block(it, "위험(급락)", "하락추세 + 역대고점 대비 급락(거품의심) 시세 $%s" % market_value)
             continue
 
         out.append(row)
