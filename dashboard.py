@@ -610,16 +610,45 @@ with tab4:
         avoided = int((lost["net_if_won"] < 0).sum()) if len(lost) else 0
         m3.metric("잘 진 패찰", f"{avoided}건",
                   help="패찰인데 이겼다면 NET 손해였을 것 = 안 사길 잘함")
+        # ---- 카드별 묶음 ----
+        def _gkey(c):
+            c = re.sub(r"\s*\(.*?\)\s*", " ", (c or "").lower())   # 세트 괄호 제거
+            return re.sub(r"\s+", " ", c).strip()
+        bdf["_g"] = bdf["card"].map(_gkey)
+        grp = []
+        for g, sub in bdf.groupby("_g"):
+            sub = sub.sort_values("created_at")
+            fin = sub["final_price"].dropna()
+            grp.append({
+                "카드": sub.iloc[-1]["card"],
+                "시도": len(sub),
+                "낙찰": int((sub["result"] == "낙찰").sum()),
+                "내입찰avg": round(sub["my_bid"].mean(), 0) if sub["my_bid"].notna().any() else None,
+                "최종가avg": round(fin.mean(), 0) if len(fin) else None,
+                "시세": sub.iloc[-1]["market_value"],
+                "최근": sub["created_at"].max(),
+                "_n": len(sub),
+            })
+        gdf = pd.DataFrame(grp).sort_values(["_n", "최근"], ascending=[False, False]).drop(columns="_n")
+        st.markdown("##### 🃏 카드별 요약 (같은 카드 묶음 · 시도 많은 순)")
         st.dataframe(
-            bdf[["id", "created_at", "card", "my_bid", "final_price", "차이",
-                 "market_value", "net_if_won", "result"]].rename(columns={
-                     "created_at": "날짜", "card": "카드", "my_bid": "내입찰",
-                     "final_price": "최종가", "market_value": "시세",
-                     "net_if_won": "이겼다면NET수익", "result": "결과"}),
-            use_container_width=True, hide_index=True,
-        )
-        st.caption("**차이** = 최종가 − 내입찰(얼마 차로 졌나) · **이겼다면NET수익** = 그 가격에 "
-                   "낙찰했다면 되팔아 남는 실수익(수수료 13%+$3·배송 반영). **음수 = 이겼으면 손해**(잘 진 것)")
+            gdf, use_container_width=True, hide_index=True,
+            column_config={
+                "내입찰avg": st.column_config.NumberColumn("내입찰(평균)", format="$%.0f"),
+                "최종가avg": st.column_config.NumberColumn("최종가(평균)", format="$%.0f"),
+                "시세": st.column_config.NumberColumn(format="$%.0f"),
+            })
+        with st.expander("📋 전체 회차 상세 (카드별·날짜순)"):
+            det = bdf.sort_values(["_g", "created_at"])
+            st.dataframe(
+                det[["created_at", "card", "my_bid", "final_price", "차이",
+                     "market_value", "net_if_won", "result"]].rename(columns={
+                         "created_at": "날짜", "card": "카드", "my_bid": "내입찰",
+                         "final_price": "최종가", "market_value": "시세",
+                         "net_if_won": "이겼다면NET", "result": "결과"}),
+                use_container_width=True, hide_index=True)
+        st.caption("**카드별 요약**: 같은 카드를 몇 번 시도했고 평균 얼마에 졌는지 한눈에. "
+                   "**이겼다면NET**(상세)=낙찰시 되팔아 남는 실수익(음수=잘 진 것).")
         did = st.number_input("삭제할 입찰 id", min_value=0, step=1, value=0, key="del_bid")
         if st.button("입찰 기록 삭제") and did:
             db.delete_bid(int(did))
