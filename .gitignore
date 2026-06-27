@@ -17,3 +17,7 @@ data/pricecharting_full.csv
 
 # 크롬 프로필 등 잔여물
 .pw_profile/
+
+# 임시 스크립트/출력 (커밋 금지)
+_*.py
+_*.txt
