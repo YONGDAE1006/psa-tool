@@ -99,6 +99,29 @@ _SET_GENERIC = {"promo", "promos", "collection", "pokemon", "trainer", "gallery"
                 "and", "edition", "base"}
 
 
+_SET_CODES = {
+    "asc": "ascended heroes", "meg": "mega evolution", "mep": "mega evolution",
+    "pfl": "phantasmal flames", "dri": "destined rivals", "ssp": "surging sparks",
+    "pre": "prismatic evolutions", "mew": "151", "twm": "twilight masquerade",
+    "paf": "paldean fates", "par": "paradox rift", "obf": "obsidian flames",
+    "tef": "temporal forces", "pal": "paldea evolved", "svi": "scarlet violet",
+    "jtg": "journey together", "wht": "white flare", "crz": "crown zenith",
+    "sit": "silver tempest", "lor": "lost origin", "asr": "astral radiance",
+    "brs": "brilliant stars", "fst": "fusion strike", "evs": "evolving skies",
+    "scr": "stellar crown",
+}
+
+
+def _code_set_hint(text):
+    """제목의 세트코드(대문자 약어 ASC·MEG·DRI 등) → 정식 세트명. 신상 세트
+    매칭 보강(PPT는 'Rayquaza 153' 0건이나 'Rayquaza ascended heroes'로 잡힘)."""
+    for m in re.findall(r"\b([A-Z]{3,4})\b", text or ""):
+        c = m.lower()
+        if c in _SET_CODES:
+            return _SET_CODES[c]
+    return None
+
+
 def _set_words(text):
     """eBay Set 필드 → 식별용 단어만 (소문자, 3글자+, 제네릭/era코드 제거).
     'Sv10: Destined Rivals'→'destined rivals', 'Swsh11: Lost Origin'→'lost origin',
@@ -171,8 +194,9 @@ def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=Fa
         return None
     # 번호: Card Number 우선(추측 불필요). 'TG29/TG30'·'213' 등도 정규화됨.
     card_number = extract_card_number(asp.get("number") or "") or extract_card_number(src)
-    # 세트단서: Set 필드(있으면) → 세트충돌 해소
-    set_hint = _set_words(asp.get("set") or "") or None
+    # 세트단서: 제목 세트코드(ASC·MEG 등) → 정식세트명 우선, 없으면 aspects Set
+    set_hint = (_code_set_hint(title or query or "")
+                or _set_words(asp.get("set") or "") or None)
     key = f"{name} #{card_number}" if card_number else name
     if set_hint:
         key += " @" + set_hint
@@ -492,8 +516,10 @@ def _ppt_resolve_id(name, card_number, base, title="", set_hint=None):
     _cross_set = bool(matched and sh and not (_cur_set & set(sh.split())))
     if qn and sh and (not matched or _cross_set):
         toks = name.split()
-        for i in range(0, max(1, len(toks))):     # 앞 토큰 0개부터 떼며
-            core = " ".join(toks[i:])
+        # 검색 후보: 앞토큰 떼는 suffix + 핵심토큰 단독(노이즈 가운데 낀 경우 대비)
+        cores = [" ".join(toks[i:]) for i in range(0, max(1, len(toks)))]
+        cores += [t for t in sorted(set(toks), key=lambda x: -len(x)) if len(t) >= 4][:2]
+        for core in cores:
             b4, m4 = pick(fetch(f"{core} {sh}".strip(), 8))
             if m4:
                 # 세트충돌 교정 중이면, 새 후보도 세트가 제목과 맞을 때만 채택(엉뚱교정 방지)

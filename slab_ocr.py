@@ -34,7 +34,9 @@ _PROMPT = (
     '"card_number" (the # number shown on the label such as "088", "TG29", "GG36" — just that '
     'token, NOT the /total), "grade" (the numeric grade, e.g. "10"), '
     '"cert" (the long certification serial number, digits only), '
-    '"name" (the card/Pokemon name on the label). Use null for any field you cannot read.'
+    '"name" (the card/Pokemon name on the label), '
+    '"set" (the set/series name on the label, e.g. "Ascended Heroes", "Mega Evolution", '
+    '"Crown Zenith"). Use null for any field you cannot read.'
 )
 
 
@@ -84,7 +86,7 @@ def read_slab(image_url):
             return {}
         d = json.loads(m.group(0))
         out = {}
-        for k in ("card_number", "grade", "cert", "name"):
+        for k in ("card_number", "grade", "cert", "name", "set"):
             v = d.get(k)
             out[k] = str(v).strip() if v not in (None, "", "null", "N/A") else None
         return out

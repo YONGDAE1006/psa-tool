@@ -171,7 +171,7 @@ def run():
                 if label.get("card_number"):
                     _ov = {"number": label["card_number"],
                            "name": aspects.get("name") or label.get("name"),
-                           "set": aspects.get("set")}
+                           "set": label.get("set") or aspects.get("set")}
                     _s2 = soldprices.get_sold(query, demo_hint=psa10, title=title, aspects=_ov)
                     if _s2 and _s2.get("num_confirmed"):
                         sold = _s2
