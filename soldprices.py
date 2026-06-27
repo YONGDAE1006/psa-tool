@@ -108,7 +108,7 @@ _SET_CODES = {
     "jtg": "journey together", "wht": "white flare", "crz": "crown zenith",
     "sit": "silver tempest", "lor": "lost origin", "asr": "astral radiance",
     "brs": "brilliant stars", "fst": "fusion strike", "evs": "evolving skies",
-    "scr": "stellar crown",
+    "scr": "stellar crown", "clc": "classic", "cel": "celebrations",
 }
 
 
@@ -194,8 +194,10 @@ def get_sold(query, demo_hint=None, tcgplayer_id=None, title=None, cache_only=Fa
         return None
     # 번호: Card Number 우선(추측 불필요). 'TG29/TG30'·'213' 등도 정규화됨.
     card_number = extract_card_number(asp.get("number") or "") or extract_card_number(src)
-    # 세트단서: 제목 세트코드(ASC·MEG 등) → 정식세트명 우선, 없으면 aspects Set
+    # 세트단서: 제목 세트코드(ASC·MEG 등) → 정식세트명 우선, 그 다음 aspects/OCR Set의
+    # 코드(CLC EN 등)도 변환, 마지막으로 Set 단어. (코드를 먼저 풀어야 PPT 검색됨)
     set_hint = (_code_set_hint(title or query or "")
+                or _code_set_hint(asp.get("set") or "")
                 or _set_words(asp.get("set") or "") or None)
     key = f"{name} #{card_number}" if card_number else name
     if set_hint:
@@ -482,8 +484,9 @@ def _ppt_resolve_id(name, card_number, base, title="", set_hint=None):
             nm_score = fuzz.token_set_ratio(name, _cn)
             ctoks = [w for w in re.findall(r"[a-z]{4,}", _cn.lower())
                      if w not in _NAME_STOP]
-            name_ok = (nm_score >= 40
-                       or any(w in name.lower() or w in hay for w in ctoks))
+            # 후보 카드명은 '질의 카드명(name)'과만 대조 — 제목 전체(hay)로 보면
+            # 덱 이름의 다른 포켓몬('Clefairy Charizard Deck'의 Charizard)으로 오통과됨.
+            name_ok = (nm_score >= 40 or any(w in name.lower() for w in ctoks))
             c = cnum(it)
             if qn and c:
                 if _num_eq(qn, c) and name_ok:
