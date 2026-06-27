@@ -82,6 +82,22 @@ def _save_manual(card_key, widget_key):
     """수동 시세 입력 저장(카드별). 0이면 삭제."""
     db.set_manual_price(card_key, st.session_state.get(widget_key, 0) or 0)
 
+
+# 과거 입찰기록 매칭용 — 카드 식별키(번호 + 주요단어). 카드명 표기가 달라도 매칭되게.
+_BID_STOP = {"vmax", "vstar", "full", "art", "holo", "promo", "pokemon", "gem",
+             "mint", "rare", "illustration", "secret", "ultra", "hyper", "card",
+             "tcg", "trainer", "gallery", "collection", "special", "alt",
+             "alternate", "english", "edition", "psa", "the", "and"}
+
+
+def _match_key(text):
+    """(번호숫자, 주요단어집합) — 같은 카드 매칭용."""
+    num = collector.extract_card_number(text or "")
+    num = re.sub(r"\D", "", num) if num else None
+    words = {w for w in re.findall(r"[a-z]{4,}", (text or "").lower())
+             if w not in _BID_STOP}
+    return num, words
+
 st.set_page_config(page_title="Pokemon PSA10 비딩 대시보드", layout="wide",
                    page_icon="🎴")
 
@@ -381,6 +397,8 @@ with tab1:
               "⚠️ 저신뢰": ("⚠️", "저신뢰·표본부족")}
 
     _manual_prices = db.get_all_manual_prices()   # 카드별 수동시세(한 번에 로드)
+    # 내 과거 입찰기록 인덱스 (카드별 매칭용) — 카드에 '내 지난 입찰가→낙찰가' 표시
+    _bidkeys = [(_match_key(b.get("card")) + (b,)) for b in db.get_bids()]
     for _, r in view.iterrows():
         ic, lbl = _BADGE.get(r["신호"], ("•", "관망"))
         with st.container(border=True):
@@ -404,6 +422,53 @@ with tab1:
                 _swarn = ("  ·  ⚠️ 신규/저평판 셀러 주의"
                           if _sfb < config.SELLER_FLAG_FEEDBACK else "")
                 st.caption(f"👤 {_sname} · 리뷰 {_sfb}{_swarn}")
+
+                # 🧾 내 과거 입찰 — 제목 아래 빈 공간에 크게 표시
+                _ln, _lw = _match_key(r.get("matched_name") or r.get("title"))
+                _past = [b for (n, w, b) in _bidkeys if _ln and n == _ln and (w & _lw)]
+                _past.sort(key=lambda b: b.get("created_at") or "", reverse=True)
+                if _past:
+                    _rows = ""
+                    for b in _past[:6]:
+                        _my = b.get("my_bid") or 0
+                        _fin = b.get("final_price")
+                        _won = b.get("result") == "낙찰"
+                        _col = "#4ade80" if _won else "#f87171"
+                        _tag = "낙찰✓" if _won else "패찰"
+                        _dt = (b.get("created_at") or "")[5:10]
+                        _fs = f"${_fin:.0f}" if pd.notna(_fin) and _fin else "-"
+                        _rows += (
+                            "<div style='font-size:14px;margin-top:4px;color:#e5e7eb'>"
+                            f"<span style='color:#8b93a1'>{_dt}</span>　"
+                            f"내 입찰 <b style='color:#cbd5e1'>${_my:.0f}</b> "
+                            f"→ 낙찰 <b style='color:{_col}'>{_fs}</b> "
+                            f"<span style='color:{_col};font-size:12px'>({_tag})</span></div>")
+                    # 평균(전체 기록 기준) — 오른쪽에 큰 숫자로
+                    _mys = [b.get("my_bid") for b in _past if b.get("my_bid")]
+                    _fns = [b.get("final_price") for b in _past
+                            if pd.notna(b.get("final_price")) and b.get("final_price")]
+                    _amy = sum(_mys) / len(_mys) if _mys else 0
+                    _afn = sum(_fns) / len(_fns) if _fns else 0
+                    _amn = min(_fns) if _fns else 0
+                    _gap = _afn - _amy
+                    _avg = (
+                        "<div style='min-width:150px;padding-left:18px;border-left:1px solid #2a2f3a'>"
+                        "<div style='font-size:11px;color:#8b93a1'>평균 내 입찰</div>"
+                        f"<div style='font-size:22px;font-weight:800;color:#cbd5e1'>${_amy:.0f}</div>"
+                        "<div style='font-size:11px;color:#8b93a1;margin-top:7px'>평균 낙찰가</div>"
+                        f"<div style='font-size:22px;font-weight:800;color:#f87171'>${_afn:.0f}</div>"
+                        "<div style='font-size:11px;color:#8b93a1;margin-top:7px'>최저 낙찰가</div>"
+                        f"<div style='font-size:22px;font-weight:800;color:#4ade80'>${_amn:.0f}</div>"
+                        f"<div style='font-size:12px;color:#8b93a1;margin-top:6px'>평균 부족 "
+                        f"<b style='color:#fbbf24'>${_gap:.0f}</b></div></div>")
+                    st.markdown(
+                        "<div style='margin-top:12px;padding:11px 16px;background:#171a21;"
+                        "border-radius:11px;border-left:4px solid #fbbf24;max-width:640px'>"
+                        "<div style='font-size:13px;color:#fbbf24;font-weight:700'>"
+                        f"🧾 이 카드 내 과거 입찰 {len(_past)}회</div>"
+                        "<div style='display:flex;gap:18px;margin-top:4px'>"
+                        f"<div style='flex:1'>{_rows}</div>{_avg}</div></div>",
+                        unsafe_allow_html=True)
 
             # 수동 시세(PriceCharting) 적용 — PPT보다 우선
             _ck = collector._card_key(r.get("title"), r.get("matched_name"))
