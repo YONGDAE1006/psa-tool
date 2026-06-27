@@ -398,8 +398,10 @@ with tab1:
               "⚠️ 저신뢰": ("⚠️", "저신뢰·표본부족")}
 
     _manual_prices = db.get_all_manual_prices()   # 카드별 수동시세(한 번에 로드)
-    # 내 과거 입찰기록 인덱스 (카드별 매칭용) — 카드에 '내 지난 입찰가→낙찰가' 표시
-    _bidkeys = [(_match_key(b.get("card")) + (b,)) for b in db.get_bids()]
+    # 내 과거 입찰기록 인덱스 (카드별 매칭용) — 카드에 '내 지난 입찰가→낙찰가' 표시.
+    # 패찰/낙찰만 = 유효한 PSA10 비교값. 제외(PSA9 오기재)·입찰불가는 비교에서 뺌.
+    _bidkeys = [(_match_key(b.get("card")) + (b,)) for b in db.get_bids()
+                if (b.get("result") or "") in ("패찰", "낙찰")]
     for _, r in view.iterrows():
         ic, lbl = _BADGE.get(r["신호"], ("•", "관망"))
         with st.container(border=True):
