@@ -500,9 +500,17 @@ def _ppt_resolve_id(name, card_number, base, title="", set_hint=None):
     #          플래그) 핵심 카드명만 남아도 엉뚱한 카드 매칭 위험 없음.
     if qn and not matched:
         toks = name.split()
-        for i in range(1, len(toks)):            # 끝 1토큰까지 떼며 시도(번호일치 필수라 안전)
-            b3, m3 = pick(fetch(f"{' '.join(toks[i:])} {card_number}".strip(), 5))
-            if m3:                                # 'Crobat ex 234', 'Raticate 202' 등에서 매칭
+        # 앞토큰 떼기(트레이너 프리픽스 'Team Rocket's Crobat'→'Crobat 234') +
+        # 핵심토큰 단독+번호('Victini 208' — 이름에 세트 노이즈 'Unova Illust Coll' 낀 경우).
+        cands = [" ".join(toks[i:]) for i in range(1, len(toks))]
+        cands += [t for t in sorted(set(toks), key=lambda x: -len(x)) if len(t) >= 4][:2]
+        _seen = set()
+        for core in cands:
+            if not core or core in _seen:
+                continue
+            _seen.add(core)
+            b3, m3 = pick(fetch(f"{core} {card_number}".strip(), 5))
+            if m3:                                # 'Crobat ex 234', 'Victini 208' 등에서 매칭
                 best, matched = b3, True
                 break
 
