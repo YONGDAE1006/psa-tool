@@ -163,6 +163,13 @@ def run():
             if _susp:
                 _ocr_count += 1
                 label = slab_ocr.read_slab(it.get("image"))
+                # 슬랩 라벨이 일본(JP)/타지역이면 제외 — 제목엔 JP 없어도 라벨로 잡힘
+                # (예: 'Mega Dream Charizard' 영어제목인데 슬랩은 'M2a JP' 일본판)
+                if re.search(r"\bjp\b|japan|korean|chinese",
+                             (label.get("set") or "").lower()):
+                    skipped["foreign"] += 1
+                    _block(it, "비영어(슬랩)", "슬랩 세트 %s" % label.get("set"))
+                    continue
                 _lg = label.get("grade") or ""
                 if _lg and not re.search(r"(?<!\d)10(?!\d)|gem", _lg.lower()):
                     skipped["grade"] += 1
