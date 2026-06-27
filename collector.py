@@ -79,6 +79,10 @@ def run():
                        reason, detail, it.get("current_bid"), it.get("end_time"))
 
     _ocr_count = 0                       # 이번 수집 OCR(비전) 호출 수 — 비용 안전장치
+    # OCR 상한 자동조정: 후보(입찰충족) 수보다 크게 잡아 의심카드가 잘리지 않게.
+    # (스펜드리밋이 최종 비용 차단이라 안전). 후보가 많아지면 자동으로 올라감.
+    _cand_n = sum(1 for it in listings if (it.get("bid_count") or 0) >= config.MIN_BID_COUNT)
+    _ocr_cap = max(config.VISION_MAX_PER_RUN, _cand_n)
     for it in listings:
         title = it["title"]
         # PSA 10 매물만 (제목에 PSA 10 표기가 있는 것)
@@ -154,7 +158,7 @@ def run():
 
         # 의심 매칭이면 슬랩 라벨 OCR로 카드번호 재확보 후 재매칭 (셀러 오입력 보정).
         # 의심 = 매칭실패 / 번호확정 안 됨 / 가격가드(입찰많은데 현재가≪시세). 비용캡 내.
-        if meets_bids and slab_ocr.enabled() and _ocr_count < config.VISION_MAX_PER_RUN:
+        if meets_bids and slab_ocr.enabled() and _ocr_count < _ocr_cap:
             _cur = (it.get("current_bid") or 0) + (it.get("shipping") or 0)
             _smed = sold.get("median") if sold else None
             _susp = ((not sold) or (not sold.get("num_confirmed"))
@@ -336,6 +340,9 @@ def run():
           f"seller<{config.MIN_SELLER_FEEDBACK}: {skipped['seller']}, "
           f"nonpoke(비포켓몬): {skipped['nonpoke']}, grade(PSA10아님): {skipped['grade']}, "
           f"risky(hidden): {skipped['risky']}, risky-alerts: {len(alert_rows)}")
+    if slab_ocr.enabled():
+        print(f"OCR(비전) 호출: {_ocr_count}건 / 상한 {_ocr_cap} (후보 {_cand_n}) "
+              f"~ 예상비용 ${_ocr_count * 0.003:.2f}")
     return len(out)
 
 
