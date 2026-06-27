@@ -422,6 +422,26 @@ def _ppt(name, card_number, tcgplayer_id, title="", set_hint=None):
     }
 
 
+# 이름게이트에서 무시할 흔한 단어(이게 겹친다고 같은 카드로 보면 안 됨 — 'Pokemon Fan Club'
+# 이 'pokemon'으로 통과해 Charizard#133에 오매칭되던 사고 방지).
+_NAME_STOP = {"pokemon", "holo", "full", "art", "promo", "card", "cards", "trainer",
+              "collection", "secret", "rare", "mint", "english", "stamped", "stamp",
+              "club", "academy", "battle", "supporter", "item", "energy", "basic",
+              "stage", "reverse", "pattern"}
+
+
+def _num_eq(a, b):
+    """카드번호 동등비교 — 평번호와 프로모접두형도 같게(133==SWSH133, 175==SVP175,
+    05==TG05). 자릿수(앞0제거) 일치로 판단."""
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+    da = re.sub(r"\D", "", str(a)).lstrip("0")
+    db_ = re.sub(r"\D", "", str(b)).lstrip("0")
+    return bool(da) and da == db_
+
+
 def _ppt_resolve_id(name, card_number, base, title="", set_hint=None):
     """이름(+카드번호) -> (tcgPlayerId, num_confirmed).
 
@@ -452,20 +472,24 @@ def _ppt_resolve_id(name, card_number, base, title="", set_hint=None):
         best, best_score, matched = None, -1.0, False
         for it in items or []:
             cname = it.get("name", "") or ""
+            # 변형 괄호 제거 — 'Pokemon Fan Club (#45 Charizard Stamped)'의 괄호 속
+            # 'Charizard'가 이름검증을 통과시켜 오매칭되던 사고 방지.
+            _cn = re.sub(r"\(.*?\)", " ", cname)
             cand = f"{it.get('setName','')} {cname}"
             score = fuzz.token_set_ratio(name, cand)
-            # 카드명(세트 제외)이 제목/질의와 실제로 겹치는지 — 번호우연일치 오매칭 차단.
+            # 카드명(세트·괄호 제외)이 제목/질의와 실제로 겹치는지 — 번호우연일치 오매칭 차단.
             # 예: 'Birthday Pikachu #24'가 'Ducklett 24'(세트명에 Pikachu)에 붙는 것 방지.
-            nm_score = fuzz.token_set_ratio(name, cname)
-            ctoks = re.findall(r"[a-z]{4,}", cname.lower())
+            nm_score = fuzz.token_set_ratio(name, _cn)
+            ctoks = [w for w in re.findall(r"[a-z]{4,}", _cn.lower())
+                     if w not in _NAME_STOP]
             name_ok = (nm_score >= 40
                        or any(w in name.lower() or w in hay for w in ctoks))
             c = cnum(it)
             if qn and c:
-                if qn == c and name_ok:
-                    score += 50          # 번호+이름 일치 = 강한 우선
+                if _num_eq(qn, c) and name_ok:
+                    score += 50          # 번호(평/프로모접두 동등)+이름 일치 = 강한 우선
                     matched = True
-                elif qn == c:
+                elif _num_eq(qn, c):
                     score -= 60          # 번호만 같고 카드명 전혀 다름 = 오매칭 → 강한 페널티
                 else:
                     score -= 30          # 번호 불일치 = 강한 페널티
