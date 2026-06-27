@@ -161,8 +161,11 @@ def run():
         if meets_bids and slab_ocr.enabled() and _ocr_count < _ocr_cap:
             _cur = (it.get("current_bid") or 0) + (it.get("shipping") or 0)
             _smed = sold.get("median") if sold else None
-            _susp = ((not sold) or (not sold.get("num_confirmed"))
-                     or (_smed and (it.get("bid_count") or 0) >= config.MIN_BID_COUNT
+            # OCR 대상 = 매칭실패(시세없음) 또는 가격가드(입찰많은데 현재가≪시세) 뿐.
+            # num_confirmed=False(이름만 매칭)는 너무 흔해 제외 — 속도·비용 대폭 절약.
+            # (우리가 본 오매칭은 모두 이 둘에 걸림: Clefairy/MegaDream=가격가드, Espeon=실패)
+            _susp = ((not _smed)
+                     or ((it.get("bid_count") or 0) >= config.MIN_BID_COUNT
                          and _cur < _smed * 0.4))
             if _susp:
                 _ocr_count += 1
