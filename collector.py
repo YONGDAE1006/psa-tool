@@ -74,7 +74,10 @@ def run():
     _excluded = db.get_excluded()        # 사용자가 '제외'한 매물 — 다시 안 긁어옴
     db.clear_blocked()                   # 차단목록 초기화(이번 수집분 새로 기록)
 
+    _blocked_ids = set()                 # 이번 수집에서 차단된 item_id (Gixen 부활에서 제외용)
+
     def _block(it, reason, detail=""):
+        _blocked_ids.add(it.get("item_id"))
         db.add_blocked(it.get("item_id"), it.get("title"), it.get("url"),
                        reason, detail, it.get("current_bid"), it.get("end_time"))
 
@@ -318,7 +321,7 @@ def run():
         nowts = dt.datetime.now(dt.timezone.utc)
         for old in db.get_listings():
             iid = old.get("item_id")
-            if iid in marked and iid not in new_ids:
+            if iid in marked and iid not in new_ids and iid not in _blocked_ids:
                 try:
                     ends = dt.datetime.fromisoformat((old.get("end_time") or "").replace("Z", "+00:00"))
                 except ValueError:
