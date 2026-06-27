@@ -91,11 +91,12 @@ _BID_STOP = {"vmax", "vstar", "full", "art", "holo", "promo", "pokemon", "gem",
 
 
 def _match_key(text):
-    """(번호숫자, 주요단어집합) — 같은 카드 매칭용."""
-    num = collector.extract_card_number(text or "")
+    """(번호숫자, 주요단어집합) — 같은 카드 매칭용. NaN/비문자열 방어."""
+    if not isinstance(text, str):
+        text = ""
+    num = collector.extract_card_number(text)
     num = re.sub(r"\D", "", num) if num else None
-    words = {w for w in re.findall(r"[a-z]{4,}", (text or "").lower())
-             if w not in _BID_STOP}
+    words = {w for w in re.findall(r"[a-z]{4,}", text.lower()) if w not in _BID_STOP}
     return num, words
 
 st.set_page_config(page_title="Pokemon PSA10 비딩 대시보드", layout="wide",
@@ -424,7 +425,8 @@ with tab1:
                 st.caption(f"👤 {_sname} · 리뷰 {_sfb}{_swarn}")
 
                 # 🧾 내 과거 입찰 — 제목 아래 빈 공간에 크게 표시
-                _ln, _lw = _match_key(r.get("matched_name") or r.get("title"))
+                _mn = r.get("matched_name")
+                _ln, _lw = _match_key(_mn if isinstance(_mn, str) and _mn else r.get("title"))
                 _past = [b for (n, w, b) in _bidkeys if _ln and n == _ln and (w & _lw)]
                 _past.sort(key=lambda b: b.get("created_at") or "", reverse=True)
                 if _past:
