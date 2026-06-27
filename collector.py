@@ -169,8 +169,10 @@ def run():
                     _block(it, "등급사기의심", "슬랩 OCR Grade=%s" % _lg)
                     continue
                 if label.get("card_number"):
-                    _ov = {"number": label["card_number"],
-                           "name": aspects.get("name") or label.get("name"),
+                    # OCR(슬랩 ground-truth) 우선 — aspects가 틀려서 OCR한 거라 OCR이 더 신뢰.
+                    # (셀러가 Zekrom을 name='Starly', number='05'로 오입력한 케이스 등)
+                    _ov = {"number": label.get("card_number"),
+                           "name": label.get("name") or aspects.get("name"),
                            "set": label.get("set") or aspects.get("set")}
                     _s2 = soldprices.get_sold(query, demo_hint=psa10, title=title, aspects=_ov)
                     if _s2 and _s2.get("num_confirmed"):
