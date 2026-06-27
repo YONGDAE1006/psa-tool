@@ -118,6 +118,14 @@ CONFIDENT_SOLD_COUNT = int(os.getenv("CONFIDENT_SOLD_COUNT", "12"))
 SOLD_CACHE_HOURS = int(os.getenv("SOLD_CACHE_HOURS", "24"))
 # 1회 수집에서 '새로' 조회할 최대 카드 수 (나머지는 캐시만 사용). 무료 등급 보호용.
 SOLD_LOOKUP_LIMIT = int(os.getenv("SOLD_LOOKUP_LIMIT", "25"))
+
+# --- 슬랩 라벨 OCR (의심 카드만 비전 API로 #번호·등급·인증번호 추출) ---
+# 키 비우면 비활성(기존 매칭만). 셀러가 번호/세트를 잘못 입력한 카드 보정용.
+VISION_PROVIDER = os.getenv("VISION_PROVIDER", "anthropic").strip().lower()
+VISION_API_KEY = os.getenv("VISION_API_KEY", "")
+VISION_MODEL = os.getenv("VISION_MODEL", "claude-haiku-4-5-20251001")
+# 1회 수집에서 OCR(비전호출) 최대 건수 — 비용 안전장치.
+VISION_MAX_PER_RUN = int(os.getenv("VISION_MAX_PER_RUN", "30"))
 # PokemonPriceTracker
 # PPT_API_KEY 는 콤마로 여러 무료 키를 넣을 수 있음. 하나가 일일한도(429)에 걸리면
 # soldprices 가 자동으로 다음 키로 전환(무료 100/일을 키 수만큼 확보). 유료키면 1개만.

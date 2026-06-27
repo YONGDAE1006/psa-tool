@@ -14,6 +14,7 @@ import ebay_client
 import links
 import matcher
 import notify
+import slab_ocr
 import soldprices
 import valuation
 from textutil import has_psa10, extract_card_number
@@ -77,6 +78,7 @@ def run():
         db.add_blocked(it.get("item_id"), it.get("title"), it.get("url"),
                        reason, detail, it.get("current_bid"), it.get("end_time"))
 
+    _ocr_count = 0                       # 이번 수집 OCR(비전) 호출 수 — 비용 안전장치
     for it in listings:
         title = it["title"]
         # PSA 10 매물만 (제목에 PSA 10 표기가 있는 것)
@@ -149,6 +151,30 @@ def run():
         )
         sold = soldprices.get_sold(query, demo_hint=psa10, title=title,
                                    cache_only=not meets_bids, aspects=aspects)
+
+        # 의심 매칭이면 슬랩 라벨 OCR로 카드번호 재확보 후 재매칭 (셀러 오입력 보정).
+        # 의심 = 매칭실패 / 번호확정 안 됨 / 가격가드(입찰많은데 현재가≪시세). 비용캡 내.
+        if meets_bids and slab_ocr.enabled() and _ocr_count < config.VISION_MAX_PER_RUN:
+            _cur = (it.get("current_bid") or 0) + (it.get("shipping") or 0)
+            _smed = sold.get("median") if sold else None
+            _susp = ((not sold) or (not sold.get("num_confirmed"))
+                     or (_smed and (it.get("bid_count") or 0) >= config.MIN_BID_COUNT
+                         and _cur < _smed * 0.4))
+            if _susp:
+                _ocr_count += 1
+                label = slab_ocr.read_slab(it.get("image"))
+                _lg = label.get("grade") or ""
+                if _lg and not re.search(r"(?<!\d)10(?!\d)|gem", _lg.lower()):
+                    skipped["grade"] += 1
+                    _block(it, "등급사기의심", "슬랩 OCR Grade=%s" % _lg)
+                    continue
+                if label.get("card_number"):
+                    _ov = {"number": label["card_number"],
+                           "name": aspects.get("name") or label.get("name"),
+                           "set": aspects.get("set")}
+                    _s2 = soldprices.get_sold(query, demo_hint=psa10, title=title, aspects=_ov)
+                    if _s2 and _s2.get("num_confirmed"):
+                        sold = _s2
 
         # 시세 기준 결정: 신뢰할 만한 실낙찰가가 있으면 그걸, 없으면 추정가
         value_trend = value_conf = None
