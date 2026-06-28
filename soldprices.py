@@ -506,7 +506,14 @@ def _ppt_resolve_id(name, card_number, base, title="", set_hint=None):
                 best_score, best = score, it
         return best, matched
 
+    _fetch_n = [0]
+
     def fetch(q, limit):
+        # 카드당 PPT 검색 횟수 상한 — 어려운 카드가 폴백을 너무 많이 돌려 PPT
+        # 분당한도(429)를 때리고 수집이 느려지는 것 방지. 상한 넘으면 검색 중단.
+        if _fetch_n[0] >= 6:
+            return []
+        _fetch_n[0] += 1
         r = _ppt_get(f"{base}/cards", {"search": q, "limit": limit})
         return ((r.json() or {}).get("data") or []) if r is not None else []
 
